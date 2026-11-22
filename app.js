@@ -1,0 +1,147 @@
+/* Entendre game screen. Pure flow logic (checkCandidate) is exported for tests; DOM code runs only in a browser. */
+(function (root) {
+  'use strict';
+  var ScoringRef = (typeof module !== 'undefined' && module.exports && typeof require === 'function' && typeof Scoring === 'undefined')
+    ? require('./scoring.js') : root.Scoring;
+
+  var MESSAGES = {
+    empty: 'type something first',
+    duplicate: 'already used',
+    notword: 'not a word',
+    nofit: "doesn't fit either category"
+  };
+
+  /* Runs the ordered checks. dictionaryCheck(word) -> Promise<bool>; fitCheck(word) -> Promise<{fitA,fitB}>.
+     Returns {accepted, reason, type, word, message}. */
+  async function checkCandidate(state, raw, dictionaryCheck, fitCheck) {
+    var word = String(raw == null ? '' : raw).trim().toLowerCase();
+    function rej(reason) { return { accepted: false, reason: reason, type: null, word: word, message: MESSAGES[reason] }; }
+    if (!word) return rej('empty');
+    if (state.submitted.indexOf(word) !== -1) return rej('duplicate');
+    if (!(await dictionaryCheck(word))) return rej('notword');
+    var fits = await fitCheck(word);
+    // re-check duplicate in case state changed while awaiting
+    if (state.submitted.indexOf(word) !== -1) return rej('duplicate');
+    var r = ScoringRef.submitWord(state, word, !!fits.fitA, !!fits.fitB);
+    if (!r.accepted) return rej(r.reason);
+    return { accepted: true, reason: null, type: r.type, word: word, message: '' };
+  }
+
+  // Uses UTC so every player gets the same puzzle at the same moment, regardless of time zone.
+  function localDateString(d) {
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
+  }
+
+  var api = { checkCandidate: checkCandidate, localDateString: localDateString, MESSAGES: MESSAGES };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (typeof document === 'undefined') return;
+
+  root.EntendreGame = api;
+  var DURATION_MS = 120000;
+  var $ = function (id) { return document.getElementById(id); };
+  var state = ScoringRef.createState();
+  var puzzle = null; // chosen in begin(), once the word sheets have loaded
+  var over = false, busy = false, msgTimer = null;
+  var input = $('input'), form = $('form'), list = $('words');
+  input.disabled = true; $('enter').disabled = true;
+
+  function showMsg(t) {
+    $('msg').textContent = t;
+    clearTimeout(msgTimer);
+    if (t) msgTimer = setTimeout(function () { $('msg').textContent = ''; }, 2200);
+  }
+
+  function render() {
+    var b = ScoringRef.breakdown(state);
+    $('aScore').textContent = '+ ' + b.aOnlyPoints;
+    $('mult').textContent = 'x ' + b.multiplier;
+    $('entendre').textContent = 'Entendre x' + Math.pow(2, b.entendreCount);
+  }
+
+  function addLine(word, type) {
+    var li = document.createElement('li');
+    var w = document.createElement('span'); w.textContent = word;
+    var t = document.createElement('span'); t.className = 'tag ' + type;
+    t.textContent = type === 'AB' ? 'Entendre' : (type === 'A' ? 'A' : 'B');
+    li.appendChild(w); li.appendChild(t);
+    list.appendChild(li);
+    list.scrollTop = list.scrollHeight;
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (over || busy) return;
+    busy = true;
+    try {
+      var res = await checkCandidate(state, input.value, root.Words.isDictionaryWord, async function (w) {
+        var r = await Promise.all([root.Words.fits(w, puzzle.categoryA.term), root.Words.fits(w, puzzle.categoryB.term)]);
+        return { fitA: r[0], fitB: r[1] };
+      });
+      if (over && res.accepted) return; // (cannot un-score; end screen reads state anyway)
+      if (res.accepted) { addLine(res.word, res.type); render(); input.value = ''; showMsg(''); }
+      else showMsg(res.message);
+    } catch (err) { showMsg('something went wrong'); }
+    finally { busy = false; if (!over) input.focus(); }
+  }
+  form.addEventListener('submit', onSubmit);
+
+  function endGame() {
+    over = true;
+    input.disabled = true; $('enter').disabled = true;
+    var b = ScoringRef.breakdown(state);
+    $('finalTotal').textContent = ScoringRef.total(state);
+    var rows = [
+      ['A-only words', b.aOnlyCount + ' (' + (b.aOnlyCount * 10) + ' pts)'],
+      ['B-only words', String(b.bOnlyCount)],
+      ['Entendre words', b.entendreCount + ' (+' + (b.entendreCount * 10) + ' pts)'],
+      ['Multiplier', 'x ' + b.multiplier]
+    ];
+    var ul = $('breakdown'); ul.innerHTML = '';
+    rows.forEach(function (r) {
+      var li = document.createElement('li');
+      var a = document.createElement('span'); a.textContent = r[0];
+      var v = document.createElement('strong'); v.textContent = r[1];
+      li.appendChild(a); li.appendChild(v); ul.appendChild(li);
+    });
+    $('end').hidden = false;
+  }
+
+  // If an in-flight submit resolves right at expiry, it is scored before the overlay reads state: wait for busy to clear.
+  function finishWhenIdle() { if (busy) setTimeout(finishWhenIdle, 30); else endGame(); }
+
+  var deadline = 0, iv = null;
+  function tick() {
+    if (over) return;
+    var left = Math.max(0, deadline - Date.now());
+    var s = Math.ceil(left / 1000);
+    $('timer').textContent = Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+    $('timer').classList.toggle('low', s <= 10);
+    if (left <= 0) { clearInterval(iv); input.disabled = true; $('enter').disabled = true; finishWhenIdle(); }
+  }
+  // Starts the puzzle and the 2-minute timer. Runs once the word sheets are loaded (or have failed to load).
+  function begin() {
+    puzzle = root.Puzzles.dailyPuzzle(localDateString(new Date()));
+    $('catA').textContent = puzzle.categoryA.label;
+    $('catB').textContent = puzzle.categoryB.label;
+    input.disabled = false; $('enter').disabled = false;
+    deadline = Date.now() + DURATION_MS;
+    iv = setInterval(tick, 250);
+    tick();
+    input.focus();
+  }
+  (root.EntendreReady || Promise.resolve()).then(begin);
+
+  $('share').addEventListener('click', function () { root.shareResult && root.shareResult(state, puzzle); });
+
+  // keep the input visible above the on-screen keyboard
+  if (root.visualViewport) {
+    var fit = function () {
+      $('game').style.height = root.visualViewport.height + 'px';
+      root.scrollTo(0, 0);
+    };
+    root.visualViewport.addEventListener('resize', fit);
+    root.visualViewport.addEventListener('scroll', fit);
+  }
+  input.focus();
+})(typeof window !== 'undefined' ? window : globalThis);

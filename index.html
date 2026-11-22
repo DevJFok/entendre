@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Entendre</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="game">
+  <header class="top">
+    <div class="score" id="aScore" aria-label="Base points">+ 0</div>
+    <div class="timer" id="timer" aria-live="off">2:00</div>
+    <div class="score mult" id="mult" aria-label="Multiplier">x 1</div>
+  </header>
+  <section class="cats">
+    <div class="cat catA" id="catA">&hellip;</div>
+    <div class="cat catB" id="catB">&hellip;</div>
+  </section>
+  <div class="entendre" id="entendre">Entendre x1</div>
+  <h1 class="heading">List Words</h1>
+  <ul class="words" id="words" aria-live="polite"></ul>
+  <div class="msg" id="msg" role="status"></div>
+  <form class="entry" id="form" autocomplete="off">
+    <input id="input" type="text" placeholder="Type here" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Type a word">
+    <button type="submit" id="enter">Enter</button>
+  </form>
+</main>
+<div class="overlay" id="end" hidden>
+  <div class="card">
+    <h2>Time's up!</h2>
+    <div class="final" id="finalTotal">0</div>
+    <div class="label">final score</div>
+    <ul class="break" id="breakdown"></ul>
+    <button type="button" id="share">Share result</button>
+  </div>
+</div>
+<script src="scoring.js"></script>
+<script src="words.js"></script>
+<script src="puzzles.js"></script>
+<script src="remote.js"></script>
+  <script src="app.js"></script>
+<script src="share.js"></script>
+</body>
+</html>
