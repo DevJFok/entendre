@@ -22,5 +22,25 @@ const assert = require('assert');
   assert.equal(Math.pow(2, b.entendreCount), 2);
   assert.equal(localDateString(new Date(2026, 0, 5)), '2026-01-05');
   assert(P.categoryA.label && P.categoryB.term);
-  console.log('all game.test.js checks passed');
+  // Singular/plural pairs score once: the second form is refused with the message for the form already used.
+{
+  const remoteMod = require('./remote.js');
+  const { canonicalForm } = remoteMod;
+  remoteMod.buildLists(remoteMod.parseCsv(['category,word,type,status,plural form,singular form', 'food,apple,dictionary,approved,apples,', 'food,apples,dictionary,approved,,apple'].join('\n')), remoteMod.parseCsv('word\n'));
+  const pairFit = async w => ({ fitA: true, fitB: false });
+  const dictAll = async () => true;
+  const st = Scoring.createState();
+  let r = await checkCandidate(st, 'apples', dictAll, pairFit, canonicalForm);
+  assert(r.accepted, 'first form scores');
+  r = await checkCandidate(st, 'apple', dictAll, pairFit, canonicalForm);
+  assert.equal(r.reason, 'pluralEntered'); assert.equal(r.message, 'plural form already entered');
+  const st2 = Scoring.createState();
+  await checkCandidate(st2, 'apple', dictAll, pairFit, canonicalForm);
+  r = await checkCandidate(st2, 'apples', dictAll, pairFit, canonicalForm);
+  assert.equal(r.reason, 'singularEntered'); assert.equal(r.message, 'singular form already entered');
+  assert.equal(Scoring.breakdown(st2).aOnlyCount, 1, 'pair scores once');
+  r = await checkCandidate(st2, 'apple', dictAll, pairFit, canonicalForm);
+  assert.equal(r.reason, 'duplicate', 'exact repeat keeps the original message');
+}
+console.log('all game.test.js checks passed');
 })().catch(e => { console.error(e); process.exit(1); });

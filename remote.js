@@ -32,13 +32,17 @@
 
   function norm(w) { return String(w || '').trim().toLowerCase(); }
 
-  var remote = { curated: {}, approved: new Set(), blocked: new Set(), loaded: false, error: null };
+  var remote = { curated: {}, approved: new Set(), blocked: new Set(), singular: Object.create(null), loaded: false, error: null };
+
+  // Each word maps to one key per singular/plural pair: the singular form when the sheet lists one, else the word itself.
+  function canonicalForm(w) { w = norm(w); return remote.singular[w] || w; }
 
   function labelFor(term) { return term.charAt(0).toUpperCase() + term.slice(1); }
 
   function buildLists(wordRows, blockRows) {
     var header = wordRows[0].map(function (h) { return h.trim().toLowerCase(); });
     var ci = header.indexOf('category'), wi = header.indexOf('word'), si = header.indexOf('status');
+    var pi = header.indexOf('plural form'), sgi = header.indexOf('singular form');
     wordRows.slice(1).forEach(function (r) {
       var cats = String(r[ci] || '').split(',').map(norm).filter(Boolean);
       var word = norm(r[wi]), status = norm(r[si]);
@@ -46,6 +50,9 @@
       // One row per word; its category cell can list several categories, separated by commas.
       cats.forEach(function (cat) { (remote.curated[cat] = remote.curated[cat] || new Set()).add(word); });
       remote.approved.add(word);
+      var plural = pi >= 0 ? norm(r[pi]) : '', singular = sgi >= 0 ? norm(r[sgi]) : '';
+      if (singular) remote.singular[word] = singular;
+      if (plural) remote.singular[plural] = word;
     });
     var bh = blockRows[0].map(function (h) { return h.trim().toLowerCase(); });
     var bi = bh.indexOf('word');
@@ -101,6 +108,7 @@
   }
 
   root.EntendreReady = (typeof document !== "undefined") ? load() : Promise.resolve(); // browser only
+  remote.canonical = canonicalForm;
   root.EntendreRemote = remote;
-  if (typeof module !== 'undefined' && module.exports) module.exports = { parseCsv: parseCsv, curatedHas: curatedHas, buildLists: buildLists, remote: remote };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { parseCsv: parseCsv, curatedHas: curatedHas, buildLists: buildLists, canonicalForm: canonicalForm, remote: remote };
 })(typeof window !== 'undefined' ? window : globalThis);

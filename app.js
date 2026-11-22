@@ -8,20 +8,35 @@
     empty: 'type something first',
     duplicate: 'already used',
     notword: 'not a word',
-    nofit: "doesn't fit either category"
+    nofit: "doesn't fit either category",
+    pluralEntered: 'plural form already entered',
+    singularEntered: 'singular form already entered'
   };
+
+  // A singular and its plural share one key (see remote.js), so only the first of the pair can score.
+  function pairReason(state, word, pairOf) {
+    var key = pairOf(word);
+    var hit = state.submitted.some(function (s) { return pairOf(s) === key; });
+    if (!hit) return null;
+    return word === key ? 'pluralEntered' : 'singularEntered';
+  }
 
   /* Runs the ordered checks. dictionaryCheck(word) -> Promise<bool>; fitCheck(word) -> Promise<{fitA,fitB}>.
      Returns {accepted, reason, type, word, message}. */
-  async function checkCandidate(state, raw, dictionaryCheck, fitCheck) {
+  async function checkCandidate(state, raw, dictionaryCheck, fitCheck, pairOf) {
+    pairOf = pairOf || function (w) { return w; };
     var word = String(raw == null ? '' : raw).trim().toLowerCase();
     function rej(reason) { return { accepted: false, reason: reason, type: null, word: word, message: MESSAGES[reason] }; }
     if (!word) return rej('empty');
     if (state.submitted.indexOf(word) !== -1) return rej('duplicate');
+    var paired = pairReason(state, word, pairOf);
+    if (paired) return rej(paired);
     if (!(await dictionaryCheck(word))) return rej('notword');
     var fits = await fitCheck(word);
     // re-check duplicate in case state changed while awaiting
     if (state.submitted.indexOf(word) !== -1) return rej('duplicate');
+    paired = pairReason(state, word, pairOf);
+    if (paired) return rej(paired);
     var r = ScoringRef.submitWord(state, word, !!fits.fitA, !!fits.fitB);
     if (!r.accepted) return rej(r.reason);
     return { accepted: true, reason: null, type: r.type, word: word, message: '' };
@@ -33,7 +48,7 @@
     return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
   }
 
-  var api = { checkCandidate: checkCandidate, localDateString: localDateString, MESSAGES: MESSAGES };
+  var api = { checkCandidate: checkCandidate, localDateString: localDateString, MESSAGES: MESSAGES, pairReason: pairReason };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -77,7 +92,10 @@
       var res = await checkCandidate(state, input.value, root.Words.isDictionaryWord, async function (w) {
         var r = await Promise.all([root.Words.fits(w, puzzle.categoryA.term), root.Words.fits(w, puzzle.categoryB.term)]);
         return { fitA: r[0], fitB: r[1] };
-      });
+      }, root.EntendreRemote && root.EntendreRemote.canonical);
+      if (!res.accepted && (res.reason === 'notword' || res.reason === 'nofit') && root.ReviewQueue) {
+        root.ReviewQueue.add(res.word, puzzle.categoryA.term + ',' + puzzle.categoryB.term);
+      }
       if (over && res.accepted) return; // (cannot un-score; end screen reads state anyway)
       if (res.accepted) { addLine(res.word, res.type); render(); input.value = ''; showMsg(''); }
       else showMsg(res.message);
@@ -89,6 +107,7 @@
   function endGame() {
     over = true;
     input.disabled = true; $('enter').disabled = true;
+    if (root.ReviewQueue) root.ReviewQueue.flush();
     var b = ScoringRef.breakdown(state);
     $('finalTotal').textContent = ScoringRef.total(state);
     var rows = [
