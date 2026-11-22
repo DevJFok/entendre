@@ -4,7 +4,7 @@
 (function (root) {
   'use strict';
   var CONFIG = {
-    wordsSheetId: '1tqWyZ_GaZbeqkwcUBOYo0yVwlLraKhtS0tbFH_8fvII',
+    wordsSheetId: '1WRT2Bgcf8qZBTU9fu6ySxDeeaGqS21dHZfHzcQPa2rw',
     blocklistSheetId: '1gj3A8qo98yoE2KBt40IZdqn5nGDnlyjPmdyb5C9Ezu0'
   };
 
@@ -40,9 +40,11 @@
     var header = wordRows[0].map(function (h) { return h.trim().toLowerCase(); });
     var ci = header.indexOf('category'), wi = header.indexOf('word'), si = header.indexOf('status');
     wordRows.slice(1).forEach(function (r) {
-      var cat = norm(r[ci]), word = norm(r[wi]), status = norm(r[si]);
-      if (!cat || !word || status !== 'approved') return;
-      (remote.curated[cat] = remote.curated[cat] || new Set()).add(word);
+      var cats = String(r[ci] || '').split(',').map(norm).filter(Boolean);
+      var word = norm(r[wi]), status = norm(r[si]);
+      if (!cats.length || !word || status !== 'approved') return;
+      // One row per word; its category cell can list several categories, separated by commas.
+      cats.forEach(function (cat) { (remote.curated[cat] = remote.curated[cat] || new Set()).add(word); });
       remote.approved.add(word);
     });
     var bh = blockRows[0].map(function (h) { return h.trim().toLowerCase(); });
@@ -100,5 +102,5 @@
 
   root.EntendreReady = (typeof document !== "undefined") ? load() : Promise.resolve(); // browser only
   root.EntendreRemote = remote;
-  if (typeof module !== 'undefined' && module.exports) module.exports = { parseCsv: parseCsv, curatedHas: curatedHas };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { parseCsv: parseCsv, curatedHas: curatedHas, buildLists: buildLists, remote: remote };
 })(typeof window !== 'undefined' ? window : globalThis);
