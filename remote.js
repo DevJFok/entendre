@@ -4,7 +4,7 @@
 (function (root) {
   'use strict';
   var CONFIG = {
-    wordsSheetId: '1WRT2Bgcf8qZBTU9fu6ySxDeeaGqS21dHZfHzcQPa2rw',
+    wordsSheetId: '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY',
     blocklistSheetId: '1gj3A8qo98yoE2KBt40IZdqn5nGDnlyjPmdyb5C9Ezu0'
   };
 
