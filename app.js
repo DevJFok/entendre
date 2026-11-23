@@ -60,6 +60,7 @@
   var puzzle = null; // chosen in begin(), once the word sheets have loaded
   var over = false, busy = false, msgTimer = null;
   var roundDate = null; // the date a round is recorded under: today for daily and endless, the archive date for archive plays
+  var started = false; // false until the player picks Play today or a round from the archive; the start buttons show until then
   var input = $('input'), form = $('form'), list = $('words');
   input.disabled = true; $('enter').disabled = true;
 
@@ -154,6 +155,7 @@
     list.innerHTML = '';
     input.value = ''; showMsg('');
     $('end').hidden = true; $('reopen').hidden = true; $('archivePage').hidden = true;
+    $('start').hidden = true; started = true;
     $('catA').textContent = p.categoryA.label;
     $('catB').textContent = p.categoryB.label;
     render();
@@ -172,11 +174,14 @@
     return cur[r.a] && cur[r.b] ? puzzleFor(r.a, r.b) : null;
   }
 
-  // Runs once the word sheets are loaded (or have failed to load).
-  (root.EntendreReady || Promise.resolve()).then(function () {
-    var today = localDateString(new Date());
-    startRound(scheduledFor(today) || root.Puzzles.dailyPuzzle(today), true, today);
-  });
+  // Play today: starts the daily round and timer once the word sheets are loaded (or have failed to load).
+  function startToday() {
+    (root.EntendreReady || Promise.resolve()).then(function () {
+      var today = localDateString(new Date());
+      startRound(scheduledFor(today) || root.Puzzles.dailyPuzzle(today), true, today);
+    });
+  }
+  $('playToday').addEventListener('click', startToday);
 
   function labelOf(term) {
     var p = root.Puzzles.pool.filter(function (x) { return x.term === term; })[0];
@@ -194,7 +199,8 @@
     if (!pair) { showMsg('no endless game available yet'); return; }
     startRound(puzzleFor(pair[0], pair[1]), false);
   });
-  $('archive').addEventListener('click', function () {
+  // Archive list: shared by the start screen's Play archive button and the results popup's Play archive button.
+  function openArchive() {
     var today = localDateString(new Date());
     var rows = ((root.EntendreRemote && root.EntendreRemote.archive) || []).filter(function (r) { return r.date <= today; });
     if (!rows.length) { showMsg('no archive yet'); return; }
@@ -212,9 +218,14 @@
     });
     $('end').hidden = true;
     $('archivePage').hidden = false;
+  }
+  $('archive').addEventListener('click', openArchive);
+  $('playArchive').addEventListener('click', openArchive);
+  // Back to where the player came from: the start buttons before any round, the results card after one.
+  $('closeArchive').addEventListener('click', function () {
+    $('archivePage').hidden = true;
+    if (started) $('end').hidden = false; else $('start').hidden = false;
   });
-  // Back to the results card for the finished game.
-  $('closeArchive').addEventListener('click', function () { $('archivePage').hidden = true; $('end').hidden = false; });
   // X closes the popup and keeps the finished game on screen. Results brings the popup back.
   $('closeEnd').addEventListener('click', function () { $('end').hidden = true; $('reopen').hidden = false; });
   $('reopen').addEventListener('click', function () { $('end').hidden = false; $('reopen').hidden = true; });
