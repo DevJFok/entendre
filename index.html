@@ -39,13 +39,13 @@
     <button type="button" id="archive" class="btn green">Play archive</button>
   </div>
 </div>
-<div class="overlay" id="archiveOverlay" hidden>
-  <div class="card">
-    <button type="button" class="close" id="closeArchive" aria-label="Close">&times;</button>
+<section id="archivePage" hidden>
+  <header class="archive-head">
     <h2>Archive</h2>
-    <ul class="break" id="archiveList"></ul>
-  </div>
-</div>
+    <button type="button" class="archive-close" id="closeArchive" aria-label="Back to results">&times;</button>
+  </header>
+  <ul class="archive-list" id="archiveList"></ul>
+</section>
 <script src="scoring.js"></script>
 <script src="words.js"></script>
 <script src="puzzles.js"></script>

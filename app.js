@@ -153,7 +153,7 @@
     over = false; busy = false;
     list.innerHTML = '';
     input.value = ''; showMsg('');
-    $('end').hidden = true; $('reopen').hidden = true; $('archiveOverlay').hidden = true;
+    $('end').hidden = true; $('reopen').hidden = true; $('archivePage').hidden = true;
     $('catA').textContent = p.categoryA.label;
     $('catB').textContent = p.categoryB.label;
     render();
@@ -202,14 +202,19 @@
     rows.slice().reverse().forEach(function (r) {
       var li = document.createElement('li');
       var btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'btn red';
-      btn.textContent = r.date + ': ' + labelOf(r.a) + ' + ' + labelOf(r.b);
+      btn.type = 'button'; btn.className = 'archive-row';
+      var dateEl = document.createElement('span'); dateEl.className = 'archive-date'; dateEl.textContent = r.date;
+      var catsEl = document.createElement('span'); catsEl.className = 'archive-cats';
+      catsEl.textContent = labelOf(r.a) + ' + ' + labelOf(r.b);
+      btn.appendChild(dateEl); btn.appendChild(catsEl);
       btn.addEventListener('click', function () { startRound(puzzleFor(r.a, r.b), false, r.date); });
       li.appendChild(btn); ul.appendChild(li);
     });
-    $('archiveOverlay').hidden = false;
+    $('end').hidden = true;
+    $('archivePage').hidden = false;
   });
-  $('closeArchive').addEventListener('click', function () { $('archiveOverlay').hidden = true; });
+  // Back to the results card for the finished game.
+  $('closeArchive').addEventListener('click', function () { $('archivePage').hidden = true; $('end').hidden = false; });
   // X closes the popup and keeps the finished game on screen. Results brings the popup back.
   $('closeEnd').addEventListener('click', function () { $('end').hidden = true; $('reopen').hidden = false; });
   $('reopen').addEventListener('click', function () { $('end').hidden = false; $('reopen').hidden = true; });
