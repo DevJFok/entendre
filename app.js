@@ -60,6 +60,7 @@
   var state = ScoringRef.createState();
   var puzzle = null; // chosen in begin(), once the word sheets have loaded
   var over = false, busy = false, msgTimer = null;
+  var roundDate = null; // the date a round is recorded under: today for daily and endless, the archive date for archive plays
   var input = $('input'), form = $('form'), list = $('words');
   input.disabled = true; $('enter').disabled = true;
 
@@ -128,6 +129,7 @@
       li.appendChild(a); li.appendChild(v); ul.appendChild(li);
     });
     $('end').hidden = false;
+    if (root.postScore) root.postScore(roundDate, puzzle.categoryA.term, puzzle.categoryB.term, ScoringRef.total(state));
   }
 
   // If an in-flight submit resolves right at expiry, it is scored before the overlay reads state: wait for busy to clear.
@@ -142,20 +144,76 @@
     $('timer').classList.toggle('low', s <= 10);
     if (left <= 0) { clearInterval(iv); input.disabled = true; $('enter').disabled = true; finishWhenIdle(); }
   }
-  // Starts the puzzle and the 2-minute timer. Runs once the word sheets are loaded (or have failed to load).
-  function begin() {
-    puzzle = root.Puzzles.dailyPuzzle(localDateString(new Date()));
-    $('catA').textContent = puzzle.categoryA.label;
-    $('catB').textContent = puzzle.categoryB.label;
+  // Starts a round with the given puzzle and a fresh 2-minute timer. daily: true also records the day's categories in the archive.
+  // daily is kept for the call sites; the Archive tab is maintained by hand, so the game only reads it.
+  function startRound(p, daily, date) {
+    clearInterval(iv);
+    puzzle = p;
+    roundDate = date || localDateString(new Date());
+    state = ScoringRef.createState();
+    over = false; busy = false;
+    list.innerHTML = '';
+    input.value = ''; showMsg('');
+    $('end').hidden = true; $('reopen').hidden = true; $('archiveOverlay').hidden = true;
+    $('catA').textContent = p.categoryA.label;
+    $('catB').textContent = p.categoryB.label;
+    render();
     input.disabled = false; $('enter').disabled = false;
     deadline = Date.now() + DURATION_MS;
     iv = setInterval(tick, 250);
     tick();
     input.focus();
   }
-  (root.EntendreReady || Promise.resolve()).then(begin);
+
+  // Today's categories come from the Archive tab when it has them; otherwise the built-in daily draw is used.
+  function scheduledFor(date) {
+    var r = (root.EntendreRemote && root.EntendreRemote.archive || []).filter(function (x) { return x.date === date; })[0];
+    if (!r) return null;
+    var cur = root.EntendreRemote.curated;
+    return cur[r.a] && cur[r.b] ? puzzleFor(r.a, r.b) : null;
+  }
+
+  // Runs once the word sheets are loaded (or have failed to load).
+  (root.EntendreReady || Promise.resolve()).then(function () {
+    var today = localDateString(new Date());
+    startRound(scheduledFor(today) || root.Puzzles.dailyPuzzle(today), true, today);
+  });
+
+  function labelOf(term) {
+    var p = root.Puzzles.pool.filter(function (x) { return x.term === term; })[0];
+    return p ? p.label : term;
+  }
+  function puzzleFor(a, b) {
+    return { categoryA: { label: labelOf(a), term: a }, categoryB: { label: labelOf(b), term: b } };
+  }
 
   $('share').addEventListener('click', function () { root.shareResult && root.shareResult(state, puzzle); });
+
+  // Popup buttons: endless picks the best-overlap pair (same every time); archive lists past daily games.
+  $('endless').addEventListener('click', function () {
+    var pair = root.Puzzles.bestPair(root.EntendreRemote ? root.EntendreRemote.curated : {});
+    if (!pair) { showMsg('no endless game available yet'); return; }
+    startRound(puzzleFor(pair[0], pair[1]), false);
+  });
+  $('archive').addEventListener('click', function () {
+    var today = localDateString(new Date());
+    var rows = ((root.EntendreRemote && root.EntendreRemote.archive) || []).filter(function (r) { return r.date <= today; });
+    if (!rows.length) { showMsg('no archive yet'); return; }
+    var ul = $('archiveList'); ul.innerHTML = '';
+    rows.slice().reverse().forEach(function (r) {
+      var li = document.createElement('li');
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn red';
+      btn.textContent = r.date + ': ' + labelOf(r.a) + ' + ' + labelOf(r.b);
+      btn.addEventListener('click', function () { startRound(puzzleFor(r.a, r.b), false, r.date); });
+      li.appendChild(btn); ul.appendChild(li);
+    });
+    $('archiveOverlay').hidden = false;
+  });
+  $('closeArchive').addEventListener('click', function () { $('archiveOverlay').hidden = true; });
+  // X closes the popup and keeps the finished game on screen. Results brings the popup back.
+  $('closeEnd').addEventListener('click', function () { $('end').hidden = true; $('reopen').hidden = false; });
+  $('reopen').addEventListener('click', function () { $('end').hidden = false; $('reopen').hidden = true; });
 
   // keep the input visible above the on-screen keyboard
   if (root.visualViewport) {

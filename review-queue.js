@@ -80,6 +80,30 @@
   if (typeof document === 'undefined') return;
 
   // Browser instance: uses the ban list loaded by remote.js and the device's local storage.
+  // Records the day's categories in the archive sheet, once per device per day. The sheet ignores repeat dates too.
+  root.postArchive = function (date, a, b) {
+    if (!CONFIG.endpoint || !root.fetch) return;
+    var storage = root.localStorage;
+    try { if (storage.getItem('entendre_archived') === date) return; } catch (e) { /* private mode */ }
+    root.fetch(CONFIG.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'archive', date: date, category_a: a, category_b: b }),
+      keepalive: true
+    }).then(function () { try { storage.setItem('entendre_archived', date); } catch (e) { /* ignore */ } }, function () {});
+  };
+
+  // Records a finished round in Historical_Scores: date, the two categories, and the score.
+  root.postScore = function (date, a, b, score) {
+    if (!CONFIG.endpoint || !root.fetch) return;
+    root.fetch(CONFIG.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'score', date: date, category_a: a, category_b: b, score: score }),
+      keepalive: true
+    }).catch(function () {});
+  };
+
   root.ReviewQueue = createQueue({
     endpoint: CONFIG.endpoint,
     batchSize: CONFIG.batchSize,

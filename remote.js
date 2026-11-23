@@ -4,7 +4,10 @@
 (function (root) {
   'use strict';
   // One spreadsheet holds both the word list and the ban list, as separate tabs.
-  var CONFIG = { sheetId: '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY' };
+  // The archive is a separate sheet: one row per daily game (date, category_a, category_b).
+  var CONFIG = { sheetId: '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY', archiveSheetId: '1t81EHCzezSIF8Q1jeZd-gbf0b27fS6DhG-0VT88TpLw' };
+
+  function archiveUrl() { return 'https://docs.google.com/spreadsheets/d/' + CONFIG.archiveSheetId + '/gviz/tq?tqx=out:csv&sheet=Archive'; }
 
   function csvUrl(tab) { return 'https://docs.google.com/spreadsheets/d/' + CONFIG.sheetId + '/gviz/tq?tqx=out:csv&sheet=' + tab; }
 
@@ -30,7 +33,25 @@
 
   function norm(w) { return String(w || '').trim().toLowerCase(); }
 
-  var remote = { curated: {}, approved: new Set(), blocked: new Set(), singular: Object.create(null), loaded: false, error: null };
+  var remote = { curated: {}, approved: new Set(), blocked: new Set(), singular: Object.create(null), archive: [], loaded: false, error: null };
+
+  // Accepts 'YYYY-MM-DD' or the sheet's 'M/D/YYYY' and returns 'YYYY-MM-DD' (or '' if neither).
+  function isoDate(s) {
+    s = String(s == null ? '' : s).trim();
+    var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) return m[3] + '-' + ('0' + m[1]).slice(-2) + '-' + ('0' + m[2]).slice(-2);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+  }
+
+  // Daily categories by date, from the Archive tab: [{date: 'YYYY-MM-DD', a: term, b: term}]. Rows without both categories are skipped.
+  function parseArchive(rows) {
+    if (!rows.length) return [];
+    var h = rows[0].map(function (x) { return norm(x); });
+    var di = h.indexOf('date'), ai = h.indexOf('category_a'), bi = h.indexOf('category_b');
+    return rows.slice(1).map(function (r) {
+      return { date: isoDate(r[di]), a: norm(r[ai]), b: norm(r[bi]) };
+    }).filter(function (r) { return r.date && r.a && r.b; });
+  }
 
   // Each word maps to one key per singular/plural pair: the singular form when the sheet lists one, else the word itself.
   function canonicalForm(w) { w = norm(w); return remote.singular[w] || w; }
@@ -101,6 +122,10 @@
     } catch (err) {
       remote.error = String(err && err.message || err); // offline or sheet not shared: use bundled data
     }
+    try {
+      var ar = await fetch(archiveUrl());
+      if (ar.ok) remote.archive = parseArchive(parseCsv(await ar.text()));
+    } catch (err) { /* archive is optional: the game still works without it */ }
     wrapWords();
     registerWithPuzzles();
   }
@@ -108,5 +133,5 @@
   root.EntendreReady = (typeof document !== "undefined") ? load() : Promise.resolve(); // browser only
   remote.canonical = canonicalForm;
   root.EntendreRemote = remote;
-  if (typeof module !== 'undefined' && module.exports) module.exports = { parseCsv: parseCsv, curatedHas: curatedHas, buildLists: buildLists, canonicalForm: canonicalForm, remote: remote };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { parseCsv: parseCsv, curatedHas: curatedHas, buildLists: buildLists, canonicalForm: canonicalForm, parseArchive: parseArchive, isoDate: isoDate, remote: remote };
 })(typeof window !== 'undefined' ? window : globalThis);

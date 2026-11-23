@@ -30,10 +30,18 @@ const pairCsv = [
   'food,bread,dictionary,approved,,',
 ].join('\n');
 buildLists(parseCsv(pairCsv), parseCsv(block));
-const { canonicalForm } = require('./remote.js');
+const { canonicalForm, parseArchive, isoDate } = require('./remote.js');
 assert.equal(canonicalForm('apples'), 'apple');
 assert.equal(canonicalForm('apple'), 'apple');
 assert.equal(canonicalForm('boxes'), 'box');
 assert.equal(canonicalForm('bread'), 'bread', 'word with no pair maps to itself');
 assert.equal(canonicalForm('unknownword'), 'unknownword');
+// Archive tab: dates as M/D/YYYY (as typed in the sheet) or YYYY-MM-DD; rows without both categories are skipped.
+const archiveRows = parseCsv('date,category_a,category_b\n11/22/2026,color,food\nnot-a-date,x,y\n11/23/2026,water,talking\n11/24/2026,,\n2026-11-25,tree,fruit\n');
+assert.deepStrictEqual(parseArchive(archiveRows), [
+  { date: '2026-11-22', a: 'color', b: 'food' },
+  { date: '2026-11-23', a: 'water', b: 'talking' },
+  { date: '2026-11-25', a: 'tree', b: 'fruit' },
+], 'M/D/YYYY and ISO dates both read; blanks and bad dates skipped');
+assert.equal(isoDate('1/5/2026'), '2026-01-05');
 console.log('all remote tests passed');

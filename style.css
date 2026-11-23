@@ -32,4 +32,12 @@ html,body{margin:0;height:100%;overflow-x:hidden;background:var(--bg);color:var(
 .label{margin-bottom:12px;opacity:.7}
 .break{list-style:none;padding:0;margin:0 0 16px;text-align:left}
 .break li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #ddd}
+.card{position:relative}
 .card button{width:100%;border:0;border-radius:999px;background:var(--yellow);color:var(--ink);font-weight:700;font-size:1.1rem;padding:14px;cursor:pointer}
+.card .btn{display:block;margin-top:10px;color:#fff}
+.card .btn.yellow{background:var(--yellow);color:var(--ink)}
+.card .btn.red{background:var(--red)}
+.card .btn.green{background:var(--green)}
+.card .close{position:absolute;top:6px;right:10px;width:auto;background:none;color:var(--ink);font-size:1.8rem;line-height:1;padding:4px 8px}
+.reopen{display:block;margin:10px auto 0;background:none;border:2px solid var(--ink);border-radius:999px;padding:8px 18px;font-weight:700;cursor:pointer;color:var(--ink)}
+.reopen[hidden]{display:none}

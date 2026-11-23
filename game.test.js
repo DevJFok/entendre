@@ -50,5 +50,19 @@ const assert = require('assert');
   assert.equal(r.reason, 'banned'); assert.equal(r.message, 'Invalid entry'); assert.equal(r.accepted, false);
   assert.equal(Scoring.breakdown(st3).aOnlyCount, 0, 'banned word does not score');
 }
+// Endless: the pair with the most shared words wins; a category inside another (fruit inside food) is skipped.
+{
+  const set = (...w) => new Set(w);
+  const curated = {
+    food: set('apple', 'pear', 'plum', 'lime', 'bread', 'rice'),
+    fruit: set('apple', 'pear', 'plum', 'lime'),   // fully inside food: that pair is skipped
+    color: set('apple', 'lime', 'plum', 'red', 'blue'),   // shares 3 with food
+    water: set('apple', 'lake', 'lime', 'plum', 'rain', 'river'), // shares 3 with food, more entries in total
+    tiny: set('apple', 'pear'),                    // under 3 entries: never chosen
+  };
+  const best = Puzzles.bestPair(curated);
+  assert.deepStrictEqual(best.slice().sort(), ['food', 'water'], 'most shared words, then most entries');
+  assert.equal(Puzzles.bestPair({ a: set('x'), b: set('y') }), null, 'no viable pair gives null');
+}
 console.log('all game.test.js checks passed');
 })().catch(e => { console.error(e); process.exit(1); });

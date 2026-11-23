@@ -3,11 +3,12 @@
  * doPost: the game sends rejected player words here (up to 50 per request, at most 50 per device per day).
  *         New words are appended to review_list with an empty review_status and category_to_add.
  * processReviewList (every minute): "approve" rows with category_to_add move to word_list (with ancestor categories
- *         from categories_list, plus plural). "reject" rows move to ban_list. Both leave review_list.
+ *         from categories_list, plus any plural/singular the reviewer typed in E:F). "reject" rows move to ban_list.
  */
 
 var WORDS_SHEET_ID = '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY';
 var REVIEW_SHEET = 'review_list', WORD_SHEET = 'word_list', CATS_SHEET = 'categories_list', BAN_SHEET = 'ban_list';
+var ARCHIVE_SHEET_ID = '1t81EHCzezSIF8Q1jeZd-gbf0b27fS6DhG-0VT88TpLw';
 var DAILY_CAP = 50, BATCH_MAX = 50;
 
 // ---------- Intake from the game ----------
@@ -17,6 +18,8 @@ function doPost(e) {
   try {
     lock.waitLock(10000);
     var body = JSON.parse(e.postData.contents || '{}');
+    if (body.action === 'archive') return archiveDay(body);
+    if (body.action === 'score') return scoreRound(body);
     var device = String(body.device || '').slice(0, 100);
     var words = Array.isArray(body.words) ? body.words.slice(0, BATCH_MAX) : [];
     if (!device || !words.length) return json({ ok: false, error: 'nothing to add' });
@@ -56,6 +59,62 @@ function doPost(e) {
   }
 }
 
+// ---------- Archive and scores ----------
+
+// Dates are compared as YYYY-MM-DD. The sheet may hold them as M/D/YYYY text or as real dates.
+function isoDate(v, tz) {
+  if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+  var s = String(v == null ? '' : v).trim();
+  var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (m) return m[3] + '-' + ('0' + m[1]).slice(-2) + '-' + ('0' + m[2]).slice(-2);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+}
+
+// Writes a YYYY-MM-DD date as M/D/YYYY text, to match the Archive tab.
+function sheetDate(iso) {
+  var p = iso.split('-');
+  return Number(p[1]) + '/' + Number(p[2]) + '/' + p[0];
+}
+
+// Fills in today's categories on the Archive tab. An existing row keeps its categories; a missing date is added.
+function archiveDay(body) {
+  var ss = SpreadsheetApp.openById(ARCHIVE_SHEET_ID);
+  var sheet = ss.getSheetByName('Archive');
+  var tz = ss.getSpreadsheetTimeZone();
+  var date = isoDate(body.date, tz), a = norm(body.category_a), b = norm(body.category_b);
+  if (!date || !/^[a-z]+$/.test(a) || !/^[a-z]+$/.test(b)) return json({ ok: false, error: 'bad archive entry' });
+  var last = sheet.getLastRow();
+  if (last > 1) {
+    var rows = sheet.getRange(2, 1, last - 1, 3).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (isoDate(rows[i][0], tz) !== date) continue;
+      if (norm(rows[i][1]) && norm(rows[i][2])) return json({ ok: true, added: 0 });
+      sheet.getRange(i + 2, 2, 1, 2).setValues([[a, b]]);
+      return json({ ok: true, added: 0, filled: true });
+    }
+  }
+  var row = sheet.getRange(last + 1, 1, 1, 3);
+  row.setNumberFormat('@');
+  row.setValues([[sheetDate(date), a, b]]);
+  return json({ ok: true, added: 1 });
+}
+
+// Records one finished round in Historical_Scores: date, the two categories, and the score.
+function scoreRound(body) {
+  var ss = SpreadsheetApp.openById(ARCHIVE_SHEET_ID);
+  var tz = ss.getSpreadsheetTimeZone();
+  var date = isoDate(body.date, tz), a = norm(body.category_a), b = norm(body.category_b);
+  var score = Math.round(Number(body.score));
+  if (!date || !/^[a-z]+$/.test(a) || !/^[a-z]+$/.test(b) || !isFinite(score) || score < 0 || score > 100000) {
+    return json({ ok: false, error: 'bad score entry' });
+  }
+  var sheet = ss.getSheetByName('Historical_Scores');
+  var row = sheet.getLastRow() + 1;
+  sheet.getRange(row, 1).setNumberFormat('@');
+  sheet.getRange(row, 1, 1, 4).setValues([[sheetDate(date), a, b, score]]);
+  return json({ ok: true, added: 1 });
+}
+
 // ---------- Approval flow ----------
 
 // Runs every minute from a time-based trigger (see installReviewTrigger), so it has the owner's permissions.
@@ -69,7 +128,8 @@ function processReviewList() {
     var sheet = ss.getSheetByName(REVIEW_SHEET);
     var last = lastFilledRow(sheet, 1);
     if (last < 2) return;
-    var data = sheet.getRange(2, 1, last - 1, 4).getValues();
+    // A:I is the review entry plus the reviewer's plural/singular (E:F) and the AI suggestions (G:I). All move together.
+    var data = sheet.getRange(2, 1, last - 1, 9).getValues();
     var keep = [];
     data.forEach(function (r) {
       var word = norm(r[0]), status = norm(r[2]), toAdd = norm(r[3]);
@@ -77,16 +137,20 @@ function processReviewList() {
         addToBanList(ss, word);
       } else if (word && status === 'approve' && toAdd) {
         var cats = expandCategories(ss, toAdd.split(','));
-        addToWordList(ss, word, cats, typeOf(cats));
+        // The reviewer types the plural (E) and/or singular (F) when they apply; each one is added as its own row.
+        var forms = [word];
+        if (norm(r[4])) forms.push(norm(r[4]));
+        if (norm(r[5])) forms.push(norm(r[5]));
+        addToWordList(ss, forms, cats, typeOf(cats));
       } else {
         keep.push(r);
         return;
       }
     });
-    // Rewrite the remaining rows at the top of A:D and clear what is left below them.
-    if (keep.length) sheet.getRange(2, 1, keep.length, 4).setValues(keep);
+    // Rewrite the remaining rows at the top, then clear what is left below them.
+    if (keep.length) sheet.getRange(2, 1, keep.length, 9).setValues(keep);
     var clearFrom = keep.length + 2;
-    if (clearFrom <= last) sheet.getRange(clearFrom, 1, last - clearFrom + 1, 4).clearContent();
+    if (clearFrom <= last) sheet.getRange(clearFrom, 1, last - clearFrom + 1, 9).clearContent();
   } finally {
     lock.releaseLock();
   }
@@ -137,44 +201,25 @@ function typeOf(cats) {
   return 'dictionary';
 }
 
-// Adds the word and its plural to word_list. If the word is already there, its categories are merged instead.
-function addToWordList(ss, word, cats, type) {
+// Adds each form (the word, plus any plural/singular the reviewer typed) to word_list.
+// If a form is already there, its categories are merged instead of adding a second row.
+function addToWordList(ss, forms, cats, type) {
   var sheet = ss.getSheetByName(WORD_SHEET);
   var rowsAll = sheet.getRange(2, 1, Math.max(1, lastWordRow(sheet) - 1), 4).getValues();
-  var entries = [[word, cats, type]];
-  var p = pluralOf(word, type);
-  if (p) entries.push([p, cats, type]);
-
-  entries.forEach(function (entry) {
-    var w = entry[0], c = entry[1], t = entry[2];
+  forms.forEach(function (w) {
     var hit = -1;
     for (var i = 0; i < rowsAll.length; i++) if (norm(rowsAll[i][1]) === w) { hit = i; break; }
     if (hit !== -1) {
-      var existing = norm(rowsAll[hit][0]).split(',').filter(Boolean);
       var merged = {};
-      existing.concat(c.split(',')).forEach(function (x) { if (x) merged[x] = true; });
+      norm(rowsAll[hit][0]).split(',').concat(cats).forEach(function (x) { if (x) merged[x] = true; });
       var joined = Object.keys(merged).sort().join(',');
       sheet.getRange(hit + 2, 1).setValue(joined);
       rowsAll[hit][0] = joined;
     } else {
-      sheet.getRange(lastWordRow(sheet) + 1, 1, 1, 4).setValues([[c, w, t, 'approved']]);
-      rowsAll.push([c, w, t, 'approved']);
+      sheet.getRange(lastWordRow(sheet) + 1, 1, 1, 4).setValues([[cats.join(','), w, type, 'approved']]);
+      rowsAll.push([cats.join(','), w, type, 'approved']);
     }
   });
-}
-
-// Plural rules copied from the sheet builder. Uncountable and invariant words get none.
-var IRREGULAR = { mouse: 'mice', goose: 'geese', potato: 'potatoes', tomato: 'tomatoes', wolf: 'wolves' };
-var INVARIANT = ['sheep', 'deer', 'moose', 'bison', 'salmon', 'trout', 'tuna', 'cod', 'bass', 'shrimp', 'fish', 'buffalo'];
-var UNCOUNTABLE = ('water rice salt sugar flour butter honey cream bread rain sleet hail mist fog dew steam vapor brine slush drizzle downpour babble burble murmur gossip banter chatter jaw yak fly tea sea ocean tide wet damp moist soak drench spill pour gush spray splash surf swell current drip leak flood deluge').split(' ');
-
-function pluralOf(w, type) {
-  if (type === 'dictionary' && UNCOUNTABLE.indexOf(w) !== -1) return null;
-  if (IRREGULAR[w]) return IRREGULAR[w];
-  if (INVARIANT.indexOf(w) !== -1) return null;
-  if (/(s|x|z|ch|sh)$/.test(w)) return w + 'es';
-  if (/[^aeiou]y$/.test(w)) return w.slice(0, -1) + 'ies';
-  return w + 's';
 }
 
 // ---------- Helpers ----------

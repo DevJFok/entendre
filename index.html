@@ -25,14 +25,25 @@
     <input id="input" type="text" placeholder="Type here" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Type a word">
     <button type="submit" id="enter">Enter</button>
   </form>
+  <button type="button" id="reopen" class="reopen" hidden>Results</button>
 </main>
 <div class="overlay" id="end" hidden>
   <div class="card">
+    <button type="button" class="close" id="closeEnd" aria-label="Close">&times;</button>
     <h2>Time's up!</h2>
     <div class="final" id="finalTotal">0</div>
     <div class="label">final score</div>
     <ul class="break" id="breakdown"></ul>
-    <button type="button" id="share">Share result</button>
+    <button type="button" id="share" class="btn yellow">Share results</button>
+    <button type="button" id="endless" class="btn red">Play endless</button>
+    <button type="button" id="archive" class="btn green">Play archive</button>
+  </div>
+</div>
+<div class="overlay" id="archiveOverlay" hidden>
+  <div class="card">
+    <button type="button" class="close" id="closeArchive" aria-label="Close">&times;</button>
+    <h2>Archive</h2>
+    <ul class="break" id="archiveList"></ul>
   </div>
 </div>
 <script src="scoring.js"></script>

@@ -66,5 +66,25 @@
     }
     return { categoryA: { label: a.label, term: a.term }, categoryB: { label: b.label, term: b.term } };
   }
-  root.Puzzles = { pool: pool, dailyPuzzle: dailyPuzzle, addCategories: addCategories, schedule: schedule, VIABLE: VIABLE };
+  // Endless mode: the pair of curated categories with the most shared words. Pairs where one category contains
+  // the other (fruit inside food) are skipped, and ties go to the pair with more entries in total.
+  function bestPair(curated) {
+    var terms = Object.keys(curated).filter(function (t) { return curated[t] && curated[t].size >= 3; });
+    var best = null;
+    for (var i = 0; i < terms.length; i++) {
+      for (var j = i + 1; j < terms.length; j++) {
+        var a = terms[i], b = terms[j], sa = curated[a].size, sb = curated[b].size;
+        var shared = 0;
+        curated[a].forEach(function (w) { if (curated[b].has(w)) shared++; });
+        if (shared < 3 || shared === Math.min(sa, sb)) continue;
+        var total = sa + sb;
+        if (!best || shared > best.shared || (shared === best.shared && total > best.total)) {
+          best = { pair: [a, b], shared: shared, total: total };
+        }
+      }
+    }
+    return best ? best.pair : null;
+  }
+
+  root.Puzzles = { pool: pool, dailyPuzzle: dailyPuzzle, addCategories: addCategories, bestPair: bestPair, schedule: schedule, VIABLE: VIABLE };
 })(typeof window !== 'undefined' ? window : globalThis);
