@@ -115,6 +115,38 @@ function scoreRound(body) {
   return json({ ok: true, added: 1 });
 }
 
+// Read side for the results curve. Returns only aggregates for today's daily game (matched by date and both categories):
+// how many scores there are, their mean and standard deviation, and the share of them below the player's score.
+// The player's own score is not in the sheet yet when this runs, so it is never counted in its own curve.
+function doGet(e) {
+  try {
+    var p = (e && e.parameter) || {};
+    if (p.action !== 'stats') return json({ ok: false, error: 'unknown action' });
+    var ss = SpreadsheetApp.openById(ARCHIVE_SHEET_ID);
+    var tz = ss.getSpreadsheetTimeZone();
+    var date = isoDate(p.date, tz), a = norm(p.a), b = norm(p.b), me = Number(p.score);
+    if (!date || !a || !b) return json({ ok: false, error: 'bad stats request' });
+    var sheet = ss.getSheetByName('Historical_Scores');
+    var last = sheet.getLastRow();
+    var scores = [];
+    if (last > 1) {
+      sheet.getRange(2, 1, last - 1, 4).getValues().forEach(function (r) {
+        var s = Number(r[3]);
+        if (isoDate(r[0], tz) === date && norm(r[1]) === a && norm(r[2]) === b && isFinite(s)) scores.push(s);
+      });
+    }
+    var n = scores.length, mean = 0, sd = 0, beat = null;
+    if (n) {
+      mean = scores.reduce(function (t, s) { return t + s; }, 0) / n;
+      sd = Math.sqrt(scores.reduce(function (t, s) { return t + (s - mean) * (s - mean); }, 0) / n);
+      if (isFinite(me)) beat = scores.filter(function (s) { return s < me; }).length / n;
+    }
+    return json({ ok: true, n: n, mean: mean, sd: sd, beat: beat });
+  } catch (err) {
+    return json({ ok: false, error: String(err) });
+  }
+}
+
 // ---------- Approval flow ----------
 
 // Runs every minute from a time-based trigger (see installReviewTrigger), so it has the owner's permissions.

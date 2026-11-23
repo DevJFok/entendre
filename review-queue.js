@@ -104,6 +104,16 @@
     }).catch(function () {});
   };
 
+  // Reads today's daily-game stats for the results curve. Resolves with {n, mean, sd, beat}, or null if the read fails.
+  root.scoreStats = function (date, a, b, score) {
+    if (!CONFIG.endpoint || !root.fetch) return Promise.resolve(null);
+    var q = '?action=stats&date=' + encodeURIComponent(date) + '&a=' + encodeURIComponent(a) +
+      '&b=' + encodeURIComponent(b) + '&score=' + encodeURIComponent(score);
+    return root.fetch(CONFIG.endpoint + q)
+      .then(function (r) { return r.json(); })
+      .then(function (j) { return j && j.ok ? j : null; }, function () { return null; });
+  };
+
   root.ReviewQueue = createQueue({
     endpoint: CONFIG.endpoint,
     batchSize: CONFIG.batchSize,

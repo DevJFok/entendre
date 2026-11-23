@@ -31,8 +31,16 @@
   <div class="card">
     <button type="button" class="close" id="closeEnd" aria-label="Close">&times;</button>
     <h2>Time's up!</h2>
-    <div class="final" id="finalTotal">0</div>
-    <div class="label">final score</div>
+    <div class="end-top">
+      <div class="end-left">
+        <div class="final" id="finalTotal">0</div>
+        <div class="label">final score</div>
+      </div>
+      <div class="curve-box" id="curveBox" hidden>
+        <svg id="curve" viewBox="0 0 140 90" role="img" aria-label="Today's score distribution with your score marked"></svg>
+      </div>
+    </div>
+    <div class="beat" id="beatLine"></div>
     <ul class="break" id="breakdown"></ul>
     <button type="button" id="share" class="btn yellow">Share results</button>
     <button type="button" id="endless" class="btn red">Play endless</button>

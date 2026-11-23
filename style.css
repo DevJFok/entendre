@@ -26,7 +26,19 @@ html,body{margin:0;height:100%;overflow-x:hidden;background:var(--bg);color:var(
 .entry input:disabled,.entry button:disabled{opacity:.5}
 .overlay{position:fixed;inset:0;background:rgba(43,43,58,.85);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
 .overlay[hidden]{display:none}
-.card{background:var(--bg);border-radius:16px;padding:22px;width:100%;max-width:360px;text-align:center}
+.card{background:var(--bg);border-radius:16px;padding:22px;width:100%;max-width:400px;text-align:center}
+.end-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:10px;align-items:center}
+.end-left{min-width:0}
+.end-top .final{font-size:2.4rem}
+.curve-box{min-width:0}
+.curve-box[hidden]{display:none}
+.curve-box svg{width:100%;height:auto;display:block;overflow:visible}
+.curve-area{fill:var(--yellow);fill-opacity:.35;stroke:var(--ink);stroke-width:1.5}
+.curve-mean{stroke:var(--ink);stroke-dasharray:2 2;opacity:.5}
+.curve-you{stroke:var(--red);stroke-width:2}
+.curve-you-label{fill:var(--red);font-weight:700;font-size:8px}
+.curve-text{fill:var(--ink);font-size:7px;opacity:.7}
+.beat{min-height:1.3rem;margin:6px 0 12px;font-weight:700;font-size:.95rem}
 .card h2{margin:0 0 6px}
 .final{font-size:3.2rem;font-weight:800;color:var(--green);line-height:1}
 .label{margin-bottom:12px;opacity:.7}

@@ -60,6 +60,7 @@
   var puzzle = null; // chosen in begin(), once the word sheets have loaded
   var over = false, busy = false, msgTimer = null;
   var roundDate = null; // the date a round is recorded under: today for daily and endless, the archive date for archive plays
+  var isDaily = false; // true only for today's daily round: the only round that is recorded and shown on the results curve
   var started = false; // false until the player picks Play today or a round from the archive; the start buttons show until then
   var input = $('input'), form = $('form'), list = $('words');
   input.disabled = true; $('enter').disabled = true;
@@ -129,7 +130,51 @@
       li.appendChild(a); li.appendChild(v); ul.appendChild(li);
     });
     $('end').hidden = false; $('reopen').hidden = true; $('giveUp').hidden = true;
-    if (root.postScore) root.postScore(roundDate, puzzle.categoryA.term, puzzle.categoryB.term, ScoringRef.total(state));
+    showCurve(ScoringRef.total(state));
+  }
+
+  // Results curve: only for today's daily game. Reads the earlier scores first, draws the curve without this player,
+  // then sends this player's score so it counts for later players.
+  function showCurve(total) {
+    var box = $('curveBox');
+    if (!isDaily) { box.hidden = true; $('beatLine').textContent = ''; return; }
+    box.hidden = false;
+    $('beatLine').textContent = 'checking today’s scores…';
+    var date = roundDate, a = puzzle.categoryA.term, b = puzzle.categoryB.term;
+    var read = root.scoreStats ? root.scoreStats(date, a, b, total) : Promise.resolve(null);
+    return read
+      .then(function (s) { try { drawCurve(s, total); } catch (e) { drawCurve(null, total); } })
+      .then(function () { if (root.postScore) root.postScore(date, a, b, total); });
+  }
+
+  // Draws a normal curve from the mean and standard deviation, spanning mean +/- 3 SD, with a vertical beam at the player's score.
+  // The beam is clamped to the edge if the score falls outside that span. Sized for a phone-width card.
+  function drawCurve(s, total) {
+    var svg = $('curve'), beat = $('beatLine');
+    var W = 140, H = 90, BASE = 72, TOP = 12, PEAK = BASE - TOP;
+    svg.innerHTML = '';
+    if (!s) { $('curveBox').hidden = true; beat.textContent = ''; return; }
+    if (!s.n) { $('curveBox').hidden = true; beat.textContent = 'You’re the first player today.'; return; }
+    beat.textContent = s.beat == null ? '' : 'You beat ' + Math.round(s.beat * 100) + '% of players today';
+    if (s.n < 2 || !(s.sd > 0)) { $('curveBox').hidden = true; return; }
+    $('curveBox').hidden = false;
+
+    var lo = s.mean - 3 * s.sd, span = 6 * s.sd;
+    function xOf(v) { return Math.min(W, Math.max(0, ((v - lo) / span) * W)); }
+    function yOf(v) { var z = (v - s.mean) / s.sd; return BASE - Math.exp(-0.5 * z * z) * PEAK; }
+
+    var pts = [];
+    for (var i = 0; i <= 60; i++) { var v = lo + (span * i) / 60; pts.push(xOf(v).toFixed(1) + ',' + yOf(v).toFixed(1)); }
+    var area = 'M0,' + BASE + ' L' + pts.join(' L') + ' L' + W + ',' + BASE + ' Z';
+    var mx = xOf(s.mean).toFixed(1), you = xOf(total), ux = you.toFixed(1);
+    var labelX = Math.min(W - 10, Math.max(10, you));
+
+    svg.innerHTML =
+      '<path class="curve-area" d="' + area + '"></path>' +
+      '<line class="curve-mean" x1="' + mx + '" y1="' + TOP + '" x2="' + mx + '" y2="' + BASE + '"></line>' +
+      '<text class="curve-text" x="' + mx + '" y="' + (BASE + 10) + '" text-anchor="middle">avg ' + Math.round(s.mean) + '</text>' +
+      '<line class="curve-you" x1="' + ux + '" y1="' + (TOP + 6) + '" x2="' + ux + '" y2="' + BASE + '"></line>' +
+      '<text class="curve-you-label" x="' + labelX.toFixed(1) + '" y="' + (TOP - 2) + '" text-anchor="middle">you</text>';
   }
 
   // If an in-flight submit resolves right at expiry, it is scored before the overlay reads state: wait for busy to clear.
@@ -155,7 +200,7 @@
     list.innerHTML = '';
     input.value = ''; showMsg('');
     $('end').hidden = true; $('reopen').hidden = false; $('archivePage').hidden = true;
-    $('start').hidden = true; started = true;
+    $('start').hidden = true; started = true; isDaily = !!daily;
     $('catA').textContent = p.categoryA.label;
     $('catB').textContent = p.categoryB.label;
     render();
