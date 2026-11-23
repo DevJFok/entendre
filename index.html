@@ -18,10 +18,6 @@
     <div class="cat catB" id="catB">&hellip;</div>
   </section>
   <div class="entendre" id="entendre">Entendre x1</div>
-  <div class="start" id="start">
-    <button type="button" id="playToday" class="btn yellow">Play today</button>
-    <button type="button" id="playArchive" class="btn green">Play archive</button>
-  </div>
   <h1 class="heading">List Words</h1>
   <ul class="words" id="words" aria-live="polite"></ul>
   <div class="msg" id="msg" role="status"></div>
@@ -41,6 +37,22 @@
     <button type="button" id="share" class="btn yellow">Share results</button>
     <button type="button" id="endless" class="btn red">Play endless</button>
     <button type="button" id="archive" class="btn green">Play archive</button>
+  </div>
+</div>
+<div class="overlay" id="start">
+  <div class="card">
+    <h2>Entendre</h2>
+    <div class="label">pick a game</div>
+    <button type="button" id="playToday" class="btn yellow">Play today</button>
+    <button type="button" id="playArchive" class="btn green">Play archive</button>
+  </div>
+</div>
+<div class="overlay" id="giveUp" hidden>
+  <div class="card">
+    <h2>Give up?</h2>
+    <div class="label">your game ends now</div>
+    <button type="button" id="giveUpYes" class="btn red">Yes</button>
+    <button type="button" id="giveUpNo" class="btn green">No</button>
   </div>
 </div>
 <section id="archivePage" hidden>

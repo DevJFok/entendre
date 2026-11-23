@@ -128,7 +128,7 @@
       var v = document.createElement('strong'); v.textContent = r[1];
       li.appendChild(a); li.appendChild(v); ul.appendChild(li);
     });
-    $('end').hidden = false;
+    $('end').hidden = false; $('reopen').hidden = true; $('giveUp').hidden = true;
     if (root.postScore) root.postScore(roundDate, puzzle.categoryA.term, puzzle.categoryB.term, ScoringRef.total(state));
   }
 
@@ -154,7 +154,7 @@
     over = false; busy = false;
     list.innerHTML = '';
     input.value = ''; showMsg('');
-    $('end').hidden = true; $('reopen').hidden = true; $('archivePage').hidden = true;
+    $('end').hidden = true; $('reopen').hidden = false; $('archivePage').hidden = true;
     $('start').hidden = true; started = true;
     $('catA').textContent = p.categoryA.label;
     $('catB').textContent = p.categoryB.label;
@@ -217,6 +217,7 @@
       li.appendChild(btn); ul.appendChild(li);
     });
     $('end').hidden = true;
+    $('start').hidden = true;
     $('archivePage').hidden = false;
   }
   $('archive').addEventListener('click', openArchive);
@@ -228,7 +229,18 @@
   });
   // X closes the popup and keeps the finished game on screen. Results brings the popup back.
   $('closeEnd').addEventListener('click', function () { $('end').hidden = true; $('reopen').hidden = false; });
-  $('reopen').addEventListener('click', function () { $('end').hidden = false; $('reopen').hidden = true; });
+  // Results: during a round it asks to give up; after the round it brings the results card back.
+  $('reopen').addEventListener('click', function () {
+    if (!over) { $('giveUp').hidden = false; return; }
+    $('end').hidden = false; $('reopen').hidden = true;
+  });
+  $('giveUpNo').addEventListener('click', function () { $('giveUp').hidden = true; input.focus(); });
+  $('giveUpYes').addEventListener('click', function () {
+    $('giveUp').hidden = true;
+    if (over) return;
+    clearInterval(iv); input.disabled = true; $('enter').disabled = true;
+    finishWhenIdle();
+  });
 
   // keep the input visible above the on-screen keyboard
   if (root.visualViewport) {
