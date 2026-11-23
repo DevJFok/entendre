@@ -94,12 +94,12 @@
   };
 
   // Records a finished round in Historical_Scores: date, the two categories, and the score.
-  root.postScore = function (date, a, b, score) {
+  root.postScore = function (date, a, b, score, mode) {
     if (!CONFIG.endpoint || !root.fetch) return;
     root.fetch(CONFIG.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'score', date: date, category_a: a, category_b: b, score: score }),
+      body: JSON.stringify({ action: 'score', date: date, category_a: a, category_b: b, score: score, mode: mode }),
       keepalive: true
     }).catch(function () {});
   };

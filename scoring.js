@@ -15,7 +15,8 @@ var Scoring = (function () {
     if (fitA && fitB) {
       type = 'AB';
       state.entendreCount++;
-      state.basePoints += 10;     // entendre doubles the total instead of adding to the multiplier
+      state.basePoints += 10;
+      state.multiplier += 1;      // an entendre also raises the B multiplier by one; it still doubles the total
     } else if (fitA) {
       type = 'A';
       state.aOnlyCount++;

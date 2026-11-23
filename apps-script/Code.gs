@@ -2,6 +2,8 @@
  *
  * doPost: the game sends rejected player words here (up to 50 per request, at most 50 per device per day).
  *         New words are appended to review_list with an empty review_status and category_to_add.
+ *         review_list columns: A word, B puzzle_categories, C review_status, D category suggestion, E category_to_add,
+ *         F plural form, G singular form, H AI suggestions, I plural/singular suggestion.
  * processReviewList (every minute): "approve" rows with category_to_add move to word_list (with ancestor categories
  *         from categories_list, plus any plural/singular the reviewer typed in E:F). "reject" rows move to ban_list.
  */
@@ -46,10 +48,10 @@ function doPost(e) {
       var ok = /^[a-z]+$/.test(word) && word.length >= 2 && word.length <= 30 && cats && added < room;
       if (!ok || blocked[word] || known[word] || existingReview[key]) { skipped++; return; }
       existingReview[key] = true;
-      rows.push([word, cats, '', '']);
+      rows.push([word, cats, '', '', '']);
       added++;
     });
-    if (rows.length) review.getRange(reviewLast + 1, 1, rows.length, 4).setValues(rows);
+    if (rows.length) review.getRange(reviewLast + 1, 1, rows.length, 5).setValues(rows);
     if (added) props.setProperty(capKey, String(used + added));
     return json({ ok: true, added: added, skipped: skipped });
   } catch (err) {
@@ -99,19 +101,20 @@ function archiveDay(body) {
   return json({ ok: true, added: 1 });
 }
 
-// Records one finished round in Historical_Scores: date, the two categories, and the score.
+// Records one finished round in Historical_Scores: date, the two categories, the score, and the mode (daily, archive or endless).
 function scoreRound(body) {
   var ss = SpreadsheetApp.openById(ARCHIVE_SHEET_ID);
   var tz = ss.getSpreadsheetTimeZone();
   var date = isoDate(body.date, tz), a = norm(body.category_a), b = norm(body.category_b);
-  var score = Math.round(Number(body.score));
-  if (!date || !/^[a-z]+$/.test(a) || !/^[a-z]+$/.test(b) || !isFinite(score) || score < 0 || score > 100000) {
+  var score = Math.round(Number(body.score)), mode = norm(body.mode);
+  if (!date || !/^[a-z]+$/.test(a) || !/^[a-z]+$/.test(b) || !isFinite(score) || score < 0 || score > 100000 ||
+      ['daily', 'archive', 'endless'].indexOf(mode) === -1) {
     return json({ ok: false, error: 'bad score entry' });
   }
   var sheet = ss.getSheetByName('Historical_Scores');
   var row = sheet.getLastRow() + 1;
   sheet.getRange(row, 1).setNumberFormat('@');
-  sheet.getRange(row, 1, 1, 4).setValues([[sheetDate(date), a, b, score]]);
+  sheet.getRange(row, 1, 1, 5).setValues([[sheetDate(date), a, b, score, mode]]);
   return json({ ok: true, added: 1 });
 }
 
@@ -130,9 +133,9 @@ function doGet(e) {
     var last = sheet.getLastRow();
     var scores = [];
     if (last > 1) {
-      sheet.getRange(2, 1, last - 1, 4).getValues().forEach(function (r) {
+      sheet.getRange(2, 1, last - 1, 5).getValues().forEach(function (r) {
         var s = Number(r[3]);
-        if (isoDate(r[0], tz) === date && norm(r[1]) === a && norm(r[2]) === b && isFinite(s)) scores.push(s);
+        if (norm(r[4]) === 'daily' && isoDate(r[0], tz) === date && norm(r[1]) === a && norm(r[2]) === b && isFinite(s)) scores.push(s);
       });
     }
     var n = scores.length, mean = 0, sd = 0, beat = null;
@@ -160,19 +163,19 @@ function processReviewList() {
     var sheet = ss.getSheetByName(REVIEW_SHEET);
     var last = lastFilledRow(sheet, 1);
     if (last < 2) return;
-    // A:I is the review entry plus the reviewer's plural/singular (E:F) and the AI suggestions (G:I). All move together.
+    // A:I is the review entry, the category suggestion (D), the reviewer's category_to_add (E), plural/singular (F:G), and the AI suggestions (H:I). All move together.
     var data = sheet.getRange(2, 1, last - 1, 9).getValues();
     var keep = [];
     data.forEach(function (r) {
-      var word = norm(r[0]), status = norm(r[2]), toAdd = norm(r[3]);
+      var word = norm(r[0]), status = norm(r[2]), toAdd = norm(r[4]);
       if (word && status === 'reject') {
         addToBanList(ss, word);
       } else if (word && status === 'approve' && toAdd) {
         var cats = expandCategories(ss, toAdd.split(','));
         // The reviewer types the plural (E) and/or singular (F) when they apply; each one is added as its own row.
         var forms = [word];
-        if (norm(r[4])) forms.push(norm(r[4]));
         if (norm(r[5])) forms.push(norm(r[5]));
+        if (norm(r[6])) forms.push(norm(r[6]));
         addToWordList(ss, forms, cats, typeOf(cats));
       } else {
         keep.push(r);

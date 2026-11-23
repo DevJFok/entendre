@@ -3,14 +3,14 @@ const Scoring = require('./scoring.js');
 
 function test(name, fn) { fn(); console.log('pass: ' + name); }
 
-test('worked example: A + B + entendre = 40 (multiplier starts at 0; B adds 1; entendre doubles the total)', () => {
+test('worked example: A + B + entendre = 80 (B adds 1; entendre adds 1 to the multiplier and doubles the total)', () => {
   const s = Scoring.createState();
   assert.strictEqual(Scoring.submitWord(s, 'lemon', true, false).type, 'A');
   assert.strictEqual(Scoring.submitWord(s, 'bread', false, true).type, 'B');
   assert.strictEqual(Scoring.submitWord(s, 'orange', true, true).type, 'AB');
-  assert.strictEqual(Scoring.total(s), 40);
+  assert.strictEqual(Scoring.total(s), 80);
   const b = Scoring.breakdown(s);
-  assert.deepStrictEqual(b, { aOnlyCount: 1, aOnlyPoints: 20, bOnlyCount: 1, entendreCount: 1, multiplier: 1, entendreMultiplier: 2, total: 40 });
+  assert.deepStrictEqual(b, { aOnlyCount: 1, aOnlyPoints: 20, bOnlyCount: 1, entendreCount: 1, multiplier: 2, entendreMultiplier: 2, total: 80 });
 });
 
 test('duplicates rejected incl. case/whitespace', () => {
@@ -39,14 +39,14 @@ test('zero words total is 0', () => {
   assert.strictEqual(Scoring.total(Scoring.createState()), 0);
 });
 
-test('three entendres: 0 until B words raise the multiplier (starts at 0), then x8', () => {
+test('three entendres raise the multiplier to 3 (x8 doubling); two B words then make it 5', () => {
   const s = Scoring.createState();
   ['a', 'b', 'c'].forEach(w => Scoring.submitWord(s, w, true, true));
-  assert.strictEqual(Scoring.total(s), 0, 'no B word yet, multiplier is 0');
+  assert.strictEqual(Scoring.total(s), 30 * 3 * 8, 'each entendre adds 1 to the multiplier');
   Scoring.submitWord(s, 'd', false, true); // B only
   Scoring.submitWord(s, 'e', false, true); // B only
-  // base 30, multiplier 2, x8
-  assert.strictEqual(Scoring.total(s), 30 * 2 * 8);
+  // base 30, multiplier 5, x8
+  assert.strictEqual(Scoring.total(s), 30 * 5 * 8);
   assert.strictEqual(s.entendreCount, 3);
 });
 

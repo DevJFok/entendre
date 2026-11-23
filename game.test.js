@@ -17,8 +17,8 @@ const assert = require('assert');
   r = await checkCandidate(s, 'bread', cdict, fit); assert(r.accepted); assert.equal(r.type, 'B');
   r = await checkCandidate(s, 'orange', cdict, fit); assert(r.accepted); assert.equal(r.type, 'AB');
   const b = Scoring.breakdown(s);
-  assert.equal(b.aOnlyPoints, 20); assert.equal(b.multiplier, 1); assert.equal(b.entendreCount, 1);
-  assert.equal(Scoring.total(s), 20 * 1 * 2); assert.equal(s.submitted.length, 3);
+  assert.equal(b.aOnlyPoints, 20); assert.equal(b.multiplier, 2); assert.equal(b.entendreCount, 1);
+  assert.equal(Scoring.total(s), 20 * 2 * 2); assert.equal(s.submitted.length, 3);
   assert.equal(Math.pow(2, b.entendreCount), 2);
   assert.equal(localDateString(new Date('2026-01-05T12:00:00-05:00')), '2026-01-05');
   // 8pm Eastern on 11/22 is still 11/22 (it is already 11/23 in UTC).

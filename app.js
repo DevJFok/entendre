@@ -60,7 +60,8 @@
   var puzzle = null; // chosen in begin(), once the word sheets have loaded
   var over = false, busy = false, msgTimer = null;
   var roundDate = null; // the date a round is recorded under: today for daily and endless, the archive date for archive plays
-  var isDaily = false; // true only for today's daily round: the only round that is recorded and shown on the results curve
+  var roundMode = 'endless'; // daily, archive or endless: sent with every score; only the daily round shows the results curve
+  var isDaily = false;
   var started = false; // false until the player picks Play today or a round from the archive; the start buttons show until then
   var input = $('input'), form = $('form'), list = $('words');
   input.disabled = true; $('enter').disabled = true;
@@ -88,6 +89,54 @@
     list.scrollTop = list.scrollHeight;
   }
 
+  // Feedback for an accepted word. A: catA pulses with a gentle note. B: catB pulses with the same note a whole step up.
+  // Entendre: both cards pulse, the entendre box jumps and slams down with sparkles, and a rising chime plays.
+  var audioCtx = null;
+  function tone(ctx, freq, start, dur, vol, wave) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = wave; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(vol, start + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(start); o.stop(start + dur + 0.05);
+  }
+  function playSound(type) {
+    try {
+      audioCtx = audioCtx || new (root.AudioContext || root.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var t = audioCtx.currentTime;
+      if (type === 'AB') {
+        [523.25, 659.25, 783.99, 1046.5].forEach(function (f, i) { tone(audioCtx, f, t + i * 0.09, 0.5, 0.18, 'triangle'); });
+      } else if (type === 'A') {
+        tone(audioCtx, 523.25, t, 0.35, 0.12, 'sine');            // C5
+      } else if (type === 'B') {
+        tone(audioCtx, 523.25 * Math.pow(2, 2 / 12), t, 0.35, 0.12, 'sine'); // D5, a whole step above C5
+      }
+    } catch (err) { /* no audio available: the game still works */ }
+  }
+  function restartAnim(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+  function sparkle(host, count) {
+    for (var i = 0; i < count; i++) {
+      var s = document.createElement('span');
+      s.className = 'spark';
+      var ang = (i / count) * Math.PI * 2 + Math.random() * 0.4, dist = 60 + Math.random() * 50;
+      s.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+      s.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+      var size = 8 + Math.random() * 10;
+      s.style.width = s.style.height = size.toFixed(1) + 'px';
+      s.style.animationDelay = (Math.random() * 0.15).toFixed(2) + 's';
+      host.appendChild(s);
+      setTimeout(function (el) { return function () { el.remove(); }; }(s), 1200);
+    }
+  }
+  function celebrate(type) {
+    if (type === 'A' || type === 'AB') restartAnim($('catA'), 'pulse');
+    if (type === 'B' || type === 'AB') restartAnim($('catB'), 'pulse');
+    if (type === 'AB') { restartAnim($('entendre'), 'burst'); sparkle($('entendre'), 12); }
+    playSound(type);
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     if (over || busy) return;
@@ -103,7 +152,7 @@
         root.ReviewQueue.add(res.word, puzzle.categoryA.term + ',' + puzzle.categoryB.term);
       }
       if (over && res.accepted) return; // (cannot un-score; end screen reads state anyway)
-      if (res.accepted) { addLine(res.word, res.type); render(); input.value = ''; showMsg(''); }
+      if (res.accepted) { addLine(res.word, res.type); render(); input.value = ''; showMsg(''); celebrate(res.type); }
       else showMsg(res.message);
     } catch (err) { showMsg('something went wrong'); }
     finally { busy = false; if (!over) input.focus(); }
@@ -137,14 +186,14 @@
   // then sends this player's score so it counts for later players.
   function showCurve(total) {
     var box = $('curveBox');
-    if (!isDaily) { box.hidden = true; $('beatLine').textContent = ''; return; }
+    if (!isDaily) { box.hidden = true; $('beatLine').textContent = ''; if (root.postScore) root.postScore(roundDate, puzzle.categoryA.term, puzzle.categoryB.term, total, roundMode); return; }
     box.hidden = false;
     $('beatLine').textContent = 'checking today’s scores…';
     var date = roundDate, a = puzzle.categoryA.term, b = puzzle.categoryB.term;
     var read = root.scoreStats ? root.scoreStats(date, a, b, total) : Promise.resolve(null);
     return read
       .then(function (s) { try { drawCurve(s, total); } catch (e) { drawCurve(null, total); } })
-      .then(function () { if (root.postScore) root.postScore(date, a, b, total); });
+      .then(function () { if (root.postScore) root.postScore(date, a, b, total, 'daily'); });
   }
 
   // Draws a normal curve from the mean and standard deviation, spanning mean +/- 3 SD, with a vertical beam at the player's score.
@@ -191,7 +240,7 @@
   }
   // Starts a round with the given puzzle and a fresh 2-minute timer. daily: true also records the day's categories in the archive.
   // daily is kept for the call sites; the Archive tab is maintained by hand, so the game only reads it.
-  function startRound(p, daily, date) {
+  function startRound(p, mode, date) {
     clearInterval(iv);
     puzzle = p;
     roundDate = date || localDateString(new Date());
@@ -200,7 +249,7 @@
     list.innerHTML = '';
     input.value = ''; showMsg('');
     $('end').hidden = true; $('reopen').hidden = false; $('archivePage').hidden = true;
-    $('start').hidden = true; started = true; isDaily = !!daily;
+    $('start').hidden = true; started = true; roundMode = mode; isDaily = mode === 'daily';
     $('catA').textContent = p.categoryA.label;
     $('catB').textContent = p.categoryB.label;
     render();
@@ -223,7 +272,7 @@
   function startToday() {
     (root.EntendreReady || Promise.resolve()).then(function () {
       var today = localDateString(new Date());
-      startRound(scheduledFor(today) || root.Puzzles.dailyPuzzle(today), true, today);
+      startRound(scheduledFor(today) || root.Puzzles.dailyPuzzle(today), 'daily', today);
     });
   }
   $('playToday').addEventListener('click', startToday);
@@ -242,7 +291,7 @@
   $('endless').addEventListener('click', function () {
     var pair = root.Puzzles.bestPair(root.EntendreRemote ? root.EntendreRemote.curated : {});
     if (!pair) { showMsg('no endless game available yet'); return; }
-    startRound(puzzleFor(pair[0], pair[1]), false);
+    startRound(puzzleFor(pair[0], pair[1]), 'endless');
   });
   // Archive list: shared by the start screen's Play archive button and the results popup's Play archive button.
   function openArchive() {
@@ -258,7 +307,7 @@
       var catsEl = document.createElement('span'); catsEl.className = 'archive-cats';
       catsEl.textContent = labelOf(r.a) + ' + ' + labelOf(r.b);
       btn.appendChild(dateEl); btn.appendChild(catsEl);
-      btn.addEventListener('click', function () { startRound(puzzleFor(r.a, r.b), false, r.date); });
+      btn.addEventListener('click', function () { startRound(puzzleFor(r.a, r.b), 'archive', r.date); });
       li.appendChild(btn); ul.appendChild(li);
     });
     $('end').hidden = true;
