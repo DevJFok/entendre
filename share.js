@@ -23,8 +23,10 @@
     ].join('\n');
   }
 
-  // UTC, to match the daily puzzle date.
-  function dateLabelFor(d) { return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate(); }
+  // New York time, to match the daily puzzle date.
+  function dateLabelFor(d) {
+    return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric' }).format(d);
+  }
 
   var api = { buildShareText: buildShareText, dateLabelFor: dateLabelFor, SITE_URL: SITE_URL };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

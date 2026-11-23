@@ -44,10 +44,9 @@
     return { accepted: true, reason: null, type: r.type, word: word, message: '' };
   }
 
-  // Uses UTC so every player gets the same puzzle at the same moment, regardless of time zone.
+  // Uses New York time so every player gets the same puzzle, and the day flips at midnight Eastern to match the Archive tab.
   function localDateString(d) {
-    function p(n) { return (n < 10 ? '0' : '') + n; }
-    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
   }
 
   var api = { checkCandidate: checkCandidate, localDateString: localDateString, MESSAGES: MESSAGES, pairReason: pairReason };

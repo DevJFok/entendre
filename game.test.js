@@ -20,7 +20,9 @@ const assert = require('assert');
   assert.equal(b.aOnlyPoints, 20); assert.equal(b.multiplier, 1); assert.equal(b.entendreCount, 1);
   assert.equal(Scoring.total(s), 20 * 1 * 2); assert.equal(s.submitted.length, 3);
   assert.equal(Math.pow(2, b.entendreCount), 2);
-  assert.equal(localDateString(new Date(2026, 0, 5)), '2026-01-05');
+  assert.equal(localDateString(new Date('2026-01-05T12:00:00-05:00')), '2026-01-05');
+  // 8pm Eastern on 11/22 is still 11/22 (it is already 11/23 in UTC).
+  assert.equal(localDateString(new Date('2026-11-23T01:00:00Z')), '2026-11-22');
   assert(P.categoryA.label && P.categoryB.term);
   // Singular/plural pairs score once: the second form is refused with the message for the form already used.
 {

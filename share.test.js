@@ -22,8 +22,8 @@ test('default site URL is used when omitted', () => {
 });
 
 test('dateLabelFor uses month name and day of month', () => {
-  assert.strictEqual(dateLabelFor(new Date(2026, 10, 22)), 'November 22');
-  assert.strictEqual(dateLabelFor(new Date(2026, 0, 5)), 'January 5');
+  assert.strictEqual(dateLabelFor(new Date('2026-11-22T15:00:00-05:00')), 'November 22');
+  assert.strictEqual(dateLabelFor(new Date('2026-01-05T15:00:00-05:00')), 'January 5');
 });
 
 console.log('all share tests passed');

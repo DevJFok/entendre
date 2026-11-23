@@ -33,8 +33,8 @@
   var VIABLE = ["color|food","color|animal","color|fruit","color|tree","color|clothing","color|drink","color|metal","color|gem","color|river","color|plant","color|mammal","food|animal","food|fruit","food|bird","food|tree","food|drink","food|fish","food|herb","food|spice","food|river","food|plant","food|vegetable","food|mammal","animal|bird","animal|clothing","animal|insect","animal|fish","animal|plant","animal|mammal","animal|reptile","fruit|tree","fruit|plant","fruit|nut","vehicle|boat","vehicle|car","flower|plant","tree|spice","tree|plant","tree|nut","body part|plant","clothing|mammal","drink|plant","herb|plant","spice|plant","plant|vegetable","plant|nut"];
   var byTerm = {};
   pool.forEach(function (p) { byTerm[p.term] = p; });
-  // Hand-picked puzzles for specific dates, as 'YYYY-MM-DD': ['termA', 'termB']. These override the random draw.
-  var schedule = { '2026-11-22': ['color', 'food'], '2026-11-23': ['water', 'talking'] }; // 11-22: Colors + Foods demo. 11-23: Water + Talking test pair (needs word sheet)
+  // Hand-picked puzzles for specific dates, as 'YYYY-MM-DD': ['termA', 'termB']. Empty: daily categories come from the Archive sheet.
+  var schedule = {};
 
   // Adds categories from the word sheet. A new pair is viable when the two curated lists share at least 3 words.
   function addCategories(cats, curated) {
