@@ -3,7 +3,7 @@
    buildShareText is pure and exported for tests (module.exports in Node). */
 (function (root) {
   'use strict';
-  var SITE_URL = 'entendre.example';
+  var SITE_URL = 'https://devjfok.github.io/entendre/';
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
 
@@ -11,7 +11,7 @@
   function buildShareText(breakdown, dateLabel, siteUrl) {
     var url = siteUrl == null ? SITE_URL : siteUrl;
     return [
-      'entendre ' + url,
+      url,
       dateLabel,
       // 🟡 = Colors-only (category A) words, 🟢 = Foods-only (category B) words,
       // ✨ = entendres (both categories). Each line shows its count and the points it earned.
@@ -102,19 +102,27 @@
     catch (e) { return Promise.reject(e); }
   }
 
+  // Phones use the system share sheet. Computers always get the text in a selectable box and on the clipboard,
+  // because desktop browsers may report Web Share as available but open nothing visible.
+  function isTouchDevice() {
+    var nav = root.navigator || {};
+    return (nav.maxTouchPoints || 0) > 0 || /Android|iPhone|iPad|iPod/i.test(nav.userAgent || '');
+  }
+
   function shareResult(state, puzzle) {
     // puzzle is unused: the share date is today's local date, per the spec.
     var text = buildShareText(root.Scoring.breakdown(state), dateLabelFor(new Date()));
     var btn = document.getElementById('share');
     // Call navigator.share synchronously so it stays inside the click's user gesture.
-    if (root.navigator && typeof root.navigator.share === 'function') {
+    if (isTouchDevice() && root.navigator && typeof root.navigator.share === 'function') {
       systemShare(text).catch(function (err) {
         if (err && err.name === 'AbortError') return; // user dismissed the share sheet
         copyOrShow(text, btn);
       });
       return;
     }
-    copyOrShow(text, btn);
+    showTextBox(text, btn);
+    copyText(text).then(function (ok) { if (ok) flashButton(btn, CONFIRM_LABEL); });
   }
 
   root.shareResult = shareResult;

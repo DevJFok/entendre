@@ -4,7 +4,7 @@
  * Does nothing until CONFIG.endpoint is set to the deployed Apps Script web app URL. */
 (function (root) {
   'use strict';
-  var CONFIG = { endpoint: 'https://script.google.com/macros/s/AKfycby6fFwVrBPnVL5Ttl0RtX91svnUAtOMD1XkU_jNkVFhhSpySkBxOqopcAxqYMtHhuZEeA/exec', batchSize: 50, dailyCap: 50 };
+  var CONFIG = { endpoint: 'https://script.google.com/macros/s/AKfycbyi7vjwKRMYlcCgBXT69zPY4qghXJXrsR2fcCh8IKdSg5eJami5YQOBt4NLf5AiorcaCQ/exec', batchSize: 50, dailyCap: 50 };
   var DEVICE_KEY = 'entendre_device', SENT_KEY = 'entendre_logged';
 
   function isLoggable(word) { return /^[a-z]+$/.test(word) && word.length >= 2 && word.length <= 30; }

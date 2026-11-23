@@ -3,12 +3,10 @@
  * Sets globalThis.EntendreReady, a promise that resolves once loading finishes either way. */
 (function (root) {
   'use strict';
-  var CONFIG = {
-    wordsSheetId: '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY',
-    blocklistSheetId: '1gj3A8qo98yoE2KBt40IZdqn5nGDnlyjPmdyb5C9Ezu0'
-  };
+  // One spreadsheet holds both the word list and the ban list, as separate tabs.
+  var CONFIG = { sheetId: '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY' };
 
-  function csvUrl(id) { return 'https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq?tqx=out:csv'; }
+  function csvUrl(tab) { return 'https://docs.google.com/spreadsheets/d/' + CONFIG.sheetId + '/gviz/tq?tqx=out:csv&sheet=' + tab; }
 
   // Minimal CSV parser: handles quoted fields and doubled quotes.
   function parseCsv(text) {
@@ -95,7 +93,7 @@
 
   async function load() {
     try {
-      var responses = await Promise.all([fetch(csvUrl(CONFIG.wordsSheetId)), fetch(csvUrl(CONFIG.blocklistSheetId))]);
+      var responses = await Promise.all([fetch(csvUrl('word_list')), fetch(csvUrl('ban_list'))]);
       if (!responses[0].ok || !responses[1].ok) throw new Error('sheet not readable');
       var texts = await Promise.all([responses[0].text(), responses[1].text()]);
       buildLists(parseCsv(texts[0]), parseCsv(texts[1]));

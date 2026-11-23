@@ -10,7 +10,8 @@
     notword: 'not a word',
     nofit: "doesn't fit either category",
     pluralEntered: 'plural form already entered',
-    singularEntered: 'singular form already entered'
+    singularEntered: 'singular form already entered',
+    banned: 'Invalid entry'
   };
 
   // A singular and its plural share one key (see remote.js), so only the first of the pair can score.
@@ -23,11 +24,12 @@
 
   /* Runs the ordered checks. dictionaryCheck(word) -> Promise<bool>; fitCheck(word) -> Promise<{fitA,fitB}>.
      Returns {accepted, reason, type, word, message}. */
-  async function checkCandidate(state, raw, dictionaryCheck, fitCheck, pairOf) {
+  async function checkCandidate(state, raw, dictionaryCheck, fitCheck, pairOf, isBanned) {
     pairOf = pairOf || function (w) { return w; };
     var word = String(raw == null ? '' : raw).trim().toLowerCase();
     function rej(reason) { return { accepted: false, reason: reason, type: null, word: word, message: MESSAGES[reason] }; }
     if (!word) return rej('empty');
+    if (isBanned && isBanned(word)) return rej('banned'); // ban_list words are refused and never reviewed
     if (state.submitted.indexOf(word) !== -1) return rej('duplicate');
     var paired = pairReason(state, word, pairOf);
     if (paired) return rej(paired);
@@ -92,7 +94,9 @@
       var res = await checkCandidate(state, input.value, root.Words.isDictionaryWord, async function (w) {
         var r = await Promise.all([root.Words.fits(w, puzzle.categoryA.term), root.Words.fits(w, puzzle.categoryB.term)]);
         return { fitA: r[0], fitB: r[1] };
-      }, root.EntendreRemote && root.EntendreRemote.canonical);
+      }, root.EntendreRemote && root.EntendreRemote.canonical, function (w) {
+        return !!(root.EntendreRemote && root.EntendreRemote.blocked && root.EntendreRemote.blocked.has(w));
+      });
       if (!res.accepted && (res.reason === 'notword' || res.reason === 'nofit') && root.ReviewQueue) {
         root.ReviewQueue.add(res.word, puzzle.categoryA.term + ',' + puzzle.categoryB.term);
       }

@@ -8,8 +8,7 @@
  */
 
 var WORDS_SHEET_ID = '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY';
-var BLOCKLIST_SHEET_ID = '1gj3A8qo98yoE2KBt40IZdqn5nGDnlyjPmdyb5C9Ezu0';
-var REVIEW_SHEET = 'review_list', WORD_SHEET = 'word_list', CATS_SHEET = 'categories_list';
+var REVIEW_SHEET = 'review_list', WORD_SHEET = 'word_list', CATS_SHEET = 'categories_list', BAN_SHEET = 'ban_list';
 var DAILY_CAP = 50, BATCH_MAX = 50;
 
 // ---------- Intake from the game ----------
@@ -36,7 +35,7 @@ function doPost(e) {
     var reviewRows = reviewLast > 1 ? review.getRange(2, 1, reviewLast - 1, 2).getValues() : [];
     reviewRows.forEach(function (r) { existingReview[norm(r[0]) + '|' + norm(r[1])] = true; });
     var known = knownWords(ss);
-    var blocked = blockedWords();
+    var blocked = blockedWords(ss);
 
     var rows = [], added = 0, skipped = 0;
     words.forEach(function (item) {
@@ -68,13 +67,20 @@ function onEdit(e) {
   var row = e.range.getRow();
   var status = norm(sheet.getRange(row, 3).getValue());
   var toAdd = norm(sheet.getRange(row, 4).getValue());
-  if (status !== 'approve' || !toAdd) return;
+  if (status !== 'approve' && status !== 'reject') return;
+  if (status === 'approve' && !toAdd) return;
 
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     var word = norm(sheet.getRange(row, 1).getValue());
     var ss = SpreadsheetApp.openById(WORDS_SHEET_ID);
+    if (status === 'reject') {
+      // Rejected words go to ban_list (word only) and leave the review queue.
+      addToBanList(ss, word);
+      sheet.deleteRow(row);
+      return;
+    }
     var cats = expandCategories(ss, toAdd.split(','));
     var type = typeOf(cats);
     addToWordList(ss, word, cats, type);
@@ -178,14 +184,20 @@ function knownWords(ss) {
   return out;
 }
 
-function blockedWords() {
+function blockedWords(ss) {
   var out = {};
-  try {
-    var sheet = SpreadsheetApp.openById(BLOCKLIST_SHEET_ID).getSheets()[0];
-    if (sheet.getLastRow() < 2) return out;
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().forEach(function (r) { var w = norm(r[0]); if (w) out[w] = true; });
-  } catch (err) { /* if the ban list can't be read, the game-side check still applies */ }
+  var sheet = ss.getSheetByName(BAN_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return out;
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().forEach(function (r) { var w = norm(r[0]); if (w) out[w] = true; });
   return out;
+}
+
+// Adds one word to ban_list unless it is already there.
+function addToBanList(ss, word) {
+  var sheet = ss.getSheetByName(BAN_SHEET);
+  var existing = blockedWords(ss);
+  if (existing[word]) return;
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 1).setValues([[word]]);
 }
 
 function norm(v) { return String(v == null ? '' : v).trim().toLowerCase(); }

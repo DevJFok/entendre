@@ -42,5 +42,13 @@ const assert = require('assert');
   r = await checkCandidate(st2, 'apple', dictAll, pairFit, canonicalForm);
   assert.equal(r.reason, 'duplicate', 'exact repeat keeps the original message');
 }
+// Words on ban_list are refused with "Invalid entry" and are not sent for review.
+{
+  const st3 = Scoring.createState();
+  const anyFit = async () => ({ fitA: true, fitB: true });
+  const r = await checkCandidate(st3, 'Spamword', async () => true, anyFit, undefined, w => w === 'spamword');
+  assert.equal(r.reason, 'banned'); assert.equal(r.message, 'Invalid entry'); assert.equal(r.accepted, false);
+  assert.equal(Scoring.breakdown(st3).aOnlyCount, 0, 'banned word does not score');
+}
 console.log('all game.test.js checks passed');
 })().catch(e => { console.error(e); process.exit(1); });
