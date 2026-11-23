@@ -5,13 +5,13 @@ const { buildShareText, dateLabelFor } = require('./share.js');
 function test(name, fn) { fn(); console.log('pass: ' + name); }
 
 test('worked example produces exact share text', () => {
-  const breakdown = { aOnlyCount: 1, aOnlyPoints: 20, bOnlyCount: 1, entendreCount: 1, multiplier: 3, total: 120 };
+  const breakdown = { aOnlyCount: 1, aOnlyPoints: 20, bOnlyCount: 1, entendreCount: 1, multiplier: 1, total: 40 };
   const text = buildShareText(breakdown, 'November 22', 'https://devjfok.github.io/entendre/');
   assert.strictEqual(text, [
     'https://devjfok.github.io/entendre/',
     'November 22',
-    '\u{1F7E1} 1 (10) \u{1F7E2} 1 ✨ 1 (10) \u{1F525} x3',
-    'Final score: 120'
+    '\u{1F7E1} 1 (10) \u{1F7E2} 1 ✨ 1 (10) \u{1F525} x2',
+    'Final score: 40'
   ].join('\n'));
   assert.deepStrictEqual(text.split('\n').length, 4);
 });
@@ -33,7 +33,7 @@ test('user example: one Colors word, one Foods word, no entendres', () => {
   assert.strictEqual(buildShareText(breakdown, 'November 22', 'https://devjfok.github.io/entendre/'), [
     'https://devjfok.github.io/entendre/',
     'November 22',
-    '\u{1F7E1} 1 (10) \u{1F7E2} 1 ✨ 0 (0) \u{1F525} x2',
+    '\u{1F7E1} 1 (10) \u{1F7E2} 1 ✨ 0 (0) \u{1F525} x1',
     'Final score: 20'
   ].join('\n'));
 });

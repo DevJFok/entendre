@@ -18,7 +18,7 @@
       '🟡 ' + breakdown.aOnlyCount + ' (' + (breakdown.aOnlyCount * 10) + ') ' +
         '🟢 ' + breakdown.bOnlyCount + ' ' +
         '✨ ' + breakdown.entendreCount + ' (' + (breakdown.entendreCount * 10) + ') ' +
-        '🔥 x' + breakdown.multiplier,
+        '🔥 x' + Math.pow(2, breakdown.entendreCount),
       'Final score: ' + breakdown.total
     ].join('\n');
   }

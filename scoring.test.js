@@ -3,14 +3,14 @@ const Scoring = require('./scoring.js');
 
 function test(name, fn) { fn(); console.log('pass: ' + name); }
 
-test('worked example totals 120', () => {
+test('worked example: A + B + entendre = 40 (multiplier starts at 0; B adds 1; entendre doubles the total)', () => {
   const s = Scoring.createState();
   assert.strictEqual(Scoring.submitWord(s, 'lemon', true, false).type, 'A');
   assert.strictEqual(Scoring.submitWord(s, 'bread', false, true).type, 'B');
   assert.strictEqual(Scoring.submitWord(s, 'orange', true, true).type, 'AB');
-  assert.strictEqual(Scoring.total(s), 120);
+  assert.strictEqual(Scoring.total(s), 40);
   const b = Scoring.breakdown(s);
-  assert.deepStrictEqual(b, { aOnlyCount: 1, aOnlyPoints: 20, bOnlyCount: 1, entendreCount: 1, multiplier: 3, total: 120 });
+  assert.deepStrictEqual(b, { aOnlyCount: 1, aOnlyPoints: 20, bOnlyCount: 1, entendreCount: 1, multiplier: 1, entendreMultiplier: 2, total: 40 });
 });
 
 test('duplicates rejected incl. case/whitespace', () => {
@@ -39,11 +39,14 @@ test('zero words total is 0', () => {
   assert.strictEqual(Scoring.total(Scoring.createState()), 0);
 });
 
-test('three entendres give x8', () => {
+test('three entendres: 0 until B words raise the multiplier (starts at 0), then x8', () => {
   const s = Scoring.createState();
   ['a', 'b', 'c'].forEach(w => Scoring.submitWord(s, w, true, true));
-  // base 30, multiplier 4, x8
-  assert.strictEqual(Scoring.total(s), 30 * 4 * 8);
+  assert.strictEqual(Scoring.total(s), 0, 'no B word yet, multiplier is 0');
+  Scoring.submitWord(s, 'd', false, true); // B only
+  Scoring.submitWord(s, 'e', false, true); // B only
+  // base 30, multiplier 2, x8
+  assert.strictEqual(Scoring.total(s), 30 * 2 * 8);
   assert.strictEqual(s.entendreCount, 3);
 });
 

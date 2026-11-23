@@ -119,7 +119,7 @@
       ['A-only words', b.aOnlyCount + ' (' + (b.aOnlyCount * 10) + ' pts)'],
       ['B-only words', String(b.bOnlyCount)],
       ['Entendre words', b.entendreCount + ' (+' + (b.entendreCount * 10) + ' pts)'],
-      ['Multiplier', 'x ' + b.multiplier]
+      ['Entendre multiplier', 'x ' + b.entendreMultiplier]
     ];
     var ul = $('breakdown'); ul.innerHTML = '';
     rows.forEach(function (r) {
