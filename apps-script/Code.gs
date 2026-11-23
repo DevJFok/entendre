@@ -2,9 +2,8 @@
  *
  * doPost: the game sends rejected player words here (up to 50 per request, at most 50 per device per day).
  *         New words are appended to review_list with an empty review_status and category_to_add.
- * onEdit: when a reviewer sets review_status to "approve" AND fills category_to_add, the word moves to
- *         word_list (with its ancestor categories from categories_list, plus its plural), and the review row is removed.
- *         "reject" rows stay in review_list.
+ * processReviewList (every minute): "approve" rows with category_to_add move to word_list (with ancestor categories
+ *         from categories_list, plus plural). "reject" rows move to ban_list. Both leave review_list.
  */
 
 var WORDS_SHEET_ID = '12vHqO51gMYOVlvb9UtITqnml6jExnSM6Vk84YYOdKJY';
@@ -59,35 +58,46 @@ function doPost(e) {
 
 // ---------- Approval flow ----------
 
-// Runs when someone edits the spreadsheet by hand.
-function onEdit(e) {
-  if (!e || !e.range) return;
-  var sheet = e.range.getSheet();
-  if (sheet.getName() !== REVIEW_SHEET || e.range.getRow() < 2) return;
-  var row = e.range.getRow();
-  var status = norm(sheet.getRange(row, 3).getValue());
-  var toAdd = norm(sheet.getRange(row, 4).getValue());
-  if (status !== 'approve' && status !== 'reject') return;
-  if (status === 'approve' && !toAdd) return;
-
+// Runs every minute from a time-based trigger (see installReviewTrigger), so it has the owner's permissions.
+// Approved rows move to word_list, rejected rows move to ban_list, and both leave review_list.
+// Only columns A to D are rewritten, so the plural/singular formulas in E and F are never shifted.
+function processReviewList() {
   var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  if (!lock.tryLock(5000)) return;
   try {
-    var word = norm(sheet.getRange(row, 1).getValue());
     var ss = SpreadsheetApp.openById(WORDS_SHEET_ID);
-    if (status === 'reject') {
-      // Rejected words go to ban_list (word only) and leave the review queue.
-      addToBanList(ss, word);
-      sheet.deleteRow(row);
-      return;
-    }
-    var cats = expandCategories(ss, toAdd.split(','));
-    var type = typeOf(cats);
-    addToWordList(ss, word, cats, type);
-    sheet.deleteRow(row);
+    var sheet = ss.getSheetByName(REVIEW_SHEET);
+    var last = lastFilledRow(sheet, 1);
+    if (last < 2) return;
+    var data = sheet.getRange(2, 1, last - 1, 4).getValues();
+    var keep = [];
+    data.forEach(function (r) {
+      var word = norm(r[0]), status = norm(r[2]), toAdd = norm(r[3]);
+      if (word && status === 'reject') {
+        addToBanList(ss, word);
+      } else if (word && status === 'approve' && toAdd) {
+        var cats = expandCategories(ss, toAdd.split(','));
+        addToWordList(ss, word, cats, typeOf(cats));
+      } else {
+        keep.push(r);
+        return;
+      }
+    });
+    // Rewrite the remaining rows at the top of A:D and clear what is left below them.
+    if (keep.length) sheet.getRange(2, 1, keep.length, 4).setValues(keep);
+    var clearFrom = keep.length + 2;
+    if (clearFrom <= last) sheet.getRange(clearFrom, 1, last - clearFrom + 1, 4).clearContent();
   } finally {
     lock.releaseLock();
   }
+}
+
+// Run this once from the Apps Script editor (select installReviewTrigger, then Run) and approve the permissions.
+function installReviewTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'processReviewList') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('processReviewList').timeBased().everyMinutes(1).create();
 }
 
 // category_to_add may hold several comma-separated categories. Each one adds its ancestors from categories_list.
