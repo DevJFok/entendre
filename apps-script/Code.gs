@@ -149,7 +149,8 @@ function doGet(e) {
       sd = Math.sqrt(scores.reduce(function (t, s) { return t + (s - mean) * (s - mean); }, 0) / n);
       if (isFinite(me)) beat = scores.filter(function (s) { return s < me; }).length / n;
     }
-    return json({ ok: true, n: n, mean: mean, sd: sd, beat: beat });
+    scores.sort(function (x, y) { return x - y; });
+    return json({ ok: true, n: n, mean: mean, sd: sd, beat: beat, scores: scores });
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }

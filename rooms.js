@@ -17,6 +17,7 @@
   var db = null, uid = null, offset = 0, connecting = null;
   var code = null, isHost = false, roomRef = null, scheduled = false, lastRoom = null;
   var lobbyTick = null, resultsTick = null, busy = false, myDone = false;
+  var myDetail = null, viewUid = null; // this player's breakdown and words after the round; the player whose List is open
 
   function cfg() { return root.ENTENDRE_FIREBASE || {}; }
   function enabled() { var c = cfg(); return !!(c.apiKey && c.databaseURL && root.firebase && root.firebase.database); }
@@ -171,32 +172,87 @@
     }, wait);
   }
 
-  // A player who gave up or ran out of time reports their score; the results card waits for everyone (or the grace period).
-  function finished(total) {
+  // A player who gave up or ran out of time reports their score, breakdown and words; the results card waits for everyone (or the grace period).
+  // detail: { b: the daily-style breakdown, words: [{w, t}] } where t is A, B or AB.
+  function finished(total, detail) {
     if (!roomRef) return;
     myDone = true;
-    roomRef.child('players/' + uid).update({ score: total, finishedAt: stamp() });
+    myDetail = detail || { b: null, words: [] };
+    roomRef.child('players/' + uid).update({
+      score: total,
+      finishedAt: stamp(),
+      breakdown: myDetail.b || null,
+      words: myDetail.words.length ? myDetail.words : null
+    });
+    var ul = $('roomBreakdown'); ul.innerHTML = '';
+    if (myDetail.b) fillRows(ul, root.Scoring.breakdownRows(myDetail.b));
     $('end').hidden = true;
     renderResults();
     clearInterval(resultsTick);
     resultsTick = setInterval(renderResults, 1000);
   }
 
+  function fillRows(ul, rows) {
+    rows.forEach(function (r) {
+      var li = document.createElement('li');
+      var a = document.createElement('span'); a.textContent = r[0];
+      var v = document.createElement('strong'); v.textContent = r[1];
+      li.appendChild(a); li.appendChild(v); ul.appendChild(li);
+    });
+  }
+
+  // The List is open only after the round has ended for everyone (or the grace period has passed).
   function renderResults() {
     if (!lastRoom || !lastRoom.startAt) return;
     var players = lastRoom.players || {};
     var ready = L.resultsReady(players, lastRoom.startAt, serverNow());
+    if (!ready) viewUid = null;
     showOnly('roomResults');
     var list = L.rankPlayers(players);
     var ol = $('roomRank'); ol.innerHTML = '';
     list.forEach(function (p) {
       var li = document.createElement('li');
-      li.textContent = p.name + (p.uid === uid ? ' (you)' : '') + ' — ' + (p.score === null ? 'no score' : p.score);
+      var text = document.createElement('span');
+      text.textContent = p.name + (p.uid === uid ? ' (you)' : '') + ' — ' + (p.score === null ? 'no score' : p.score);
+      li.appendChild(text);
+      if (ready && p.score !== null) {
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'room-list-btn'; btn.textContent = 'List';
+        btn.setAttribute('data-uid', p.uid);
+        li.appendChild(btn);
+      }
       ol.appendChild(li);
     });
     var missing = list.filter(function (p) { return p.score === null; }).length;
     $('roomWait').textContent = ready ? 'Round over' : 'Waiting for ' + missing + (missing === 1 ? ' player' : ' players') + '…';
+    $('roomMine').hidden = !myDetail;
+    var viewing = !!(viewUid && ready && players[viewUid]);
+    $('roomMain').hidden = viewing;
+    $('roomList').hidden = !viewing;
     if (ready) clearInterval(resultsTick);
+  }
+
+  // Shows one player's breakdown and words. Only reachable from a finished round's results.
+  function openList(id) {
+    var players = (lastRoom && lastRoom.players) || {};
+    var p = players[id];
+    if (!p || !L.resultsReady(players, lastRoom.startAt, serverNow()) || p.score === null) return;
+    viewUid = id;
+    $('roomListName').textContent = (p.name || 'player') + (id === uid ? ' (you)' : '') + '’s list';
+    var ul = $('roomListBreak'); ul.innerHTML = '';
+    if (p.breakdown) fillRows(ul, root.Scoring.breakdownRows(p.breakdown));
+    var words = $('roomListWords'); words.innerHTML = '';
+    (p.words || []).forEach(function (item) {
+      var li = document.createElement('li');
+      var w = document.createElement('span'); w.textContent = item.w;
+      var t = document.createElement('span'); t.className = 'tag ' + item.t;
+      t.textContent = item.t === 'AB' ? 'Entendre' : item.t;
+      li.appendChild(w); li.appendChild(t); words.appendChild(li);
+    });
+    if (!(p.words || []).length) {
+      var none = document.createElement('li'); none.textContent = 'No words entered.'; words.appendChild(none);
+    }
+    renderResults();
   }
 
   // The room went away: the host left, the lobby expired, or it was removed while waiting.
@@ -213,6 +269,7 @@
     clearInterval(lobbyTick); clearInterval(resultsTick);
     if (roomRef) roomRef.off();
     code = null; roomRef = null; isHost = false; scheduled = false; lastRoom = null; myDone = false;
+    myDetail = null; viewUid = null;
   }
 
   // Detaches listeners before writing, so the removal does not bounce back as "room closed" on this phone.
@@ -235,6 +292,11 @@
   var formMode = 'create';
   $('privateRoom').addEventListener('click', function () {
     $('start').hidden = true;
+    $('roomNote').textContent = enabled() ? '' : 'Private rooms are not set up yet.';
+    showOnly('roomChoice');
+  });
+  $('privateRoomEnd').addEventListener('click', function () {
+    $('end').hidden = true;
     $('roomNote').textContent = enabled() ? '' : 'Private rooms are not set up yet.';
     showOnly('roomChoice');
   });
@@ -272,7 +334,12 @@
 
   $('lobbyStart').addEventListener('click', start);
   $('lobbyLeave').addEventListener('click', leave);
-  $('roomResultsClose').addEventListener('click', function () { showOnly(null); });
+  $('roomResultsClose').addEventListener('click', function () { viewUid = null; showOnly(null); });
+  $('roomRank').addEventListener('click', function (e) {
+    var id = e.target && e.target.getAttribute && e.target.getAttribute('data-uid');
+    if (id) openList(id);
+  });
+  $('roomListBack').addEventListener('click', function () { viewUid = null; renderResults(); });
   $('roomResultsLeave').addEventListener('click', leave);
 
   root.EntendreRooms = { finished: finished, enabled: enabled };

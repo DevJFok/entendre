@@ -57,6 +57,7 @@
   var DURATION_MS = 120000;
   var $ = function (id) { return document.getElementById(id); };
   var state = ScoringRef.createState();
+  var wordLog = []; // accepted words with their type (A, B or AB), in the order entered: sent to a private room at the end
   var puzzle = null; // chosen in begin(), once the word sheets have loaded
   var over = false, busy = false, msgTimer = null;
   var roundDate = null; // the date a round is recorded under: today for daily and endless, the archive date for archive plays
@@ -152,7 +153,7 @@
         root.ReviewQueue.add(res.word, puzzle.categoryA.term + ',' + puzzle.categoryB.term);
       }
       if (over && res.accepted) return; // (cannot un-score; end screen reads state anyway)
-      if (res.accepted) { addLine(res.word, res.type); render(); input.value = ''; showMsg(''); celebrate(res.type); }
+      if (res.accepted) { wordLog.push({ w: res.word, t: res.type }); addLine(res.word, res.type); render(); input.value = ''; showMsg(''); celebrate(res.type); }
       else showMsg(res.message);
     } catch (err) { showMsg('something went wrong'); }
     finally { busy = false; if (!over) input.focus(); }
@@ -165,14 +166,8 @@
     if (root.ReviewQueue) root.ReviewQueue.flush();
     var b = ScoringRef.breakdown(state);
     $('finalTotal').textContent = ScoringRef.total(state);
-    var rows = [
-      ['A-only words', b.aOnlyCount + ' (' + (b.aOnlyCount * 10) + ' pts)'],
-      ['B-only words', String(b.bOnlyCount)],
-      ['Entendre words', b.entendreCount + ' (+' + (b.entendreCount * 10) + ' pts)'],
-      ['Entendre multiplier', 'x ' + b.entendreMultiplier]
-    ];
     var ul = $('breakdown'); ul.innerHTML = '';
-    rows.forEach(function (r) {
+    ScoringRef.breakdownRows(b).forEach(function (r) {
       var li = document.createElement('li');
       var a = document.createElement('span'); a.textContent = r[0];
       var v = document.createElement('strong'); v.textContent = r[1];
@@ -180,7 +175,7 @@
     });
     $('end').hidden = false; $('reopen').hidden = true; $('giveUp').hidden = true;
     showCurve(ScoringRef.total(state));
-    if (roomCode && root.EntendreRooms) root.EntendreRooms.finished(ScoringRef.total(state));
+    if (roomCode && root.EntendreRooms) root.EntendreRooms.finished(ScoringRef.total(state), { b: b, words: wordLog.slice() });
   }
 
   // Results curve: only for today's daily game. Reads the earlier scores first, draws the curve without this player,
@@ -197,34 +192,39 @@
       .then(function () { if (root.postScore) root.postScore(date, a, b, total, 'daily'); });
   }
 
-  // Draws a normal curve from the mean and standard deviation, spanning mean +/- 3 SD, with a vertical beam at the player's score.
-  // The beam is clamped to the edge if the score falls outside that span. Sized for a phone-width card.
+  // Draws a smooth bell curve of today's logged daily scores (the real results, from the sheet), with the player's score marked.
+  // The curve runs from 0 to the highest score among the logged scores and this player's score, so the marker is always on it.
   function drawCurve(s, total) {
     var svg = $('curve'), beat = $('beatLine');
-    var W = 140, H = 90, BASE = 72, TOP = 12, PEAK = BASE - TOP;
+    var W = 140, BASE = 72, TOP = 12, STEPS = 70;
     svg.innerHTML = '';
     if (!s) { $('curveBox').hidden = true; beat.textContent = ''; return; }
     if (!s.n) { $('curveBox').hidden = true; beat.textContent = 'You’re the first player today.'; return; }
     beat.textContent = s.beat == null ? '' : 'You beat ' + Math.round(s.beat * 100) + '% of players today';
-    if (s.n < 2 || !(s.sd > 0)) { $('curveBox').hidden = true; return; }
+    var scores = (s.scores || []).slice();
+    if (scores.length < 2) { $('curveBox').hidden = true; return; }
     $('curveBox').hidden = false;
 
-    var lo = s.mean - 3 * s.sd, span = 6 * s.sd;
-    function xOf(v) { return Math.min(W, Math.max(0, ((v - lo) / span) * W)); }
-    function yOf(v) { var z = (v - s.mean) / s.sd; return BASE - Math.exp(-0.5 * z * z) * PEAK; }
+    var hi = Math.max(1, total, scores[scores.length - 1]);
+    var xs = [], i;
+    for (i = 0; i <= STEPS; i++) xs.push(hi * i / STEPS);
+    var ys = ScoringRef.density(scores, xs);
+    var peak = Math.max.apply(null, ys) || 1;
+    var k = (BASE - TOP) / peak;
+    var pts = xs.map(function (x, j) { return [(W * j / STEPS), BASE - ys[j] * k]; });
+    var line = pts.map(function (p, j) { return (j ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+    var parts = [];
+    parts.push('<path class="curve-area" d="' + line + ' L' + W + ',' + BASE + ' L0,' + BASE + ' Z"></path>');
+    parts.push('<path class="curve-line" d="' + line + '"></path>');
 
-    var pts = [];
-    for (var i = 0; i <= 60; i++) { var v = lo + (span * i) / 60; pts.push(xOf(v).toFixed(1) + ',' + yOf(v).toFixed(1)); }
-    var area = 'M0,' + BASE + ' L' + pts.join(' L') + ' L' + W + ',' + BASE + ' Z';
-    var mx = xOf(s.mean).toFixed(1), you = xOf(total), ux = you.toFixed(1);
-    var labelX = Math.min(W - 10, Math.max(10, you));
-
-    svg.innerHTML =
-      '<path class="curve-area" d="' + area + '"></path>' +
-      '<line class="curve-mean" x1="' + mx + '" y1="' + TOP + '" x2="' + mx + '" y2="' + BASE + '"></line>' +
-      '<text class="curve-text" x="' + mx + '" y="' + (BASE + 10) + '" text-anchor="middle">avg ' + Math.round(s.mean) + '</text>' +
-      '<line class="curve-you" x1="' + ux + '" y1="' + (TOP + 6) + '" x2="' + ux + '" y2="' + BASE + '"></line>' +
-      '<text class="curve-you-label" x="' + labelX.toFixed(1) + '" y="' + (TOP - 2) + '" text-anchor="middle">you</text>';
+    var ux = W * total / hi;
+    var uy = BASE - ScoringRef.density(scores, [total])[0] * k;
+    parts.push('<line class="curve-you" x1="' + ux.toFixed(1) + '" y1="' + (TOP + 6) + '" x2="' + ux.toFixed(1) + '" y2="' + BASE + '"></line>');
+    parts.push('<circle class="curve-dot" cx="' + ux.toFixed(1) + '" cy="' + uy.toFixed(1) + '" r="2.6"></circle>');
+    parts.push('<text class="curve-you-label" x="' + Math.min(W - 10, Math.max(10, ux)).toFixed(1) + '" y="' + (TOP - 2) + '" text-anchor="middle">you</text>');
+    parts.push('<text class="curve-text" x="0" y="' + (BASE + 10) + '">0</text>');
+    parts.push('<text class="curve-text" x="' + W + '" y="' + (BASE + 10) + '" text-anchor="end">' + hi + '</text>');
+    svg.innerHTML = parts.join('');
   }
 
   // If an in-flight submit resolves right at expiry, it is scored before the overlay reads state: wait for busy to clear.
@@ -249,13 +249,14 @@
     puzzle = p;
     roundDate = date || localDateString(new Date());
     state = ScoringRef.createState();
+    wordLog = [];
     over = false; busy = false;
     list.innerHTML = '';
     input.value = ''; showMsg('');
     $('end').hidden = true; $('reopen').hidden = false; $('archivePage').hidden = true;
     $('start').hidden = true; started = true; roundMode = mode; isDaily = mode === 'daily';
     roomCode = mode === 'room' ? (opts.roomCode || null) : null;
-    $('endless').hidden = mode === 'room'; $('archive').hidden = mode === 'room';
+    $('endless').hidden = mode === 'room'; $('archive').hidden = mode === 'room'; $('privateRoomEnd').hidden = mode === 'room';
     $('catA').textContent = p.categoryA.label;
     $('catB').textContent = p.categoryB.label;
     render();
