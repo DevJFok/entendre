@@ -316,6 +316,10 @@
   }
   $('archive').addEventListener('click', openArchive);
   $('playArchive').addEventListener('click', openArchive);
+  function setHowTo(open) { $('howTo').hidden = !open; }
+  $('howToBtn').addEventListener('click', function () { setHowTo(true); });
+  $('howToOk').addEventListener('click', function () { setHowTo(false); });
+  $('howToClose').addEventListener('click', function () { setHowTo(false); });
   // Back to where the player came from: the start buttons before any round, the results card after one.
   $('closeArchive').addEventListener('click', function () {
     $('archivePage').hidden = true;
