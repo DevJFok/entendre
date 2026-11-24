@@ -54,6 +54,9 @@ html,body{margin:0;height:100%;overflow-x:hidden;background:var(--purple) url("d
 .card .close{position:absolute;top:6px;right:10px;width:auto;background:transparent;box-shadow:none;color:var(--ink);font-size:1.8rem;line-height:1;padding:4px 8px}
 #endless{background:transparent;border-color:var(--green);color:var(--green);margin-top:14px}
 #archive{margin-top:24px}
+/* The results card buttons share one even gap. */
+#end .btn,#end button{margin-top:12px}
+#end .close{margin-top:0}
 .reopen{display:block;margin:10px auto 0;background:none;border:2px solid var(--ink);border-radius:999px;padding:8px 18px;font-weight:700;cursor:pointer;color:var(--ink)}
 .reopen[hidden]{display:none}
 #archivePage{position:fixed;inset:0;z-index:11;background:var(--bg);overflow-y:auto;padding:max(12px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));max-width:480px;margin:0 auto}
