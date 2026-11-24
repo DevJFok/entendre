@@ -7,11 +7,12 @@
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
 
-  /* breakdown: the object returned by Scoring.breakdown(state). dateLabel: e.g. 'November 22'. */
+  /* breakdown: the object returned by Scoring.breakdown(state). dateLabel: e.g. 'November 22'.
+     The first line starts with the word Play, so the link is not the first thing in the pasted text. */
   function buildShareText(breakdown, dateLabel, siteUrl) {
     var url = siteUrl == null ? SITE_URL : siteUrl;
     return [
-      url,
+      'Play: ' + url,
       dateLabel,
       // 🟡 = Colors-only (category A) words, 🟢 = Foods-only (category B) words,
       // ✨ = entendres (both categories). Each line shows its count and the points it earned.

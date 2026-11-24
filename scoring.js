@@ -46,7 +46,33 @@ var Scoring = (function () {
     };
   }
 
-  return { createState: createState, submitWord: submitWord, total: total, breakdown: breakdown };
+  // Smooth density of the logged scores (Gaussian kernels, Silverman bandwidth), evaluated at each x.
+  // Returns an array the same length as xs. Empty input gives all zeros.
+  function density(values, xs) {
+    var n = values.length;
+    if (!n) return xs.map(function () { return 0; });
+    var mean = values.reduce(function (t, v) { return t + v; }, 0) / n;
+    var sd = Math.sqrt(values.reduce(function (t, v) { return t + (v - mean) * (v - mean); }, 0) / n);
+    var h = Math.max(1, 1.06 * sd * Math.pow(n, -0.2)); // never narrower than one point
+    var norm = 1 / (n * h * Math.sqrt(2 * Math.PI));
+    return xs.map(function (x) {
+      var s = 0;
+      for (var i = 0; i < n; i++) { var z = (x - values[i]) / h; s += Math.exp(-0.5 * z * z); }
+      return s * norm;
+    });
+  }
+
+  // Plain-text lines for a breakdown, shared by the daily results and the private room results.
+  function breakdownRows(b) {
+    return [
+      ['A-only words', b.aOnlyCount + ' (' + (b.aOnlyCount * 10) + ' pts)'],
+      ['B-only words', String(b.bOnlyCount)],
+      ['Entendre words', b.entendreCount + ' (+' + (b.entendreCount * 10) + ' pts)'],
+      ['Entendre multiplier', 'x ' + b.entendreMultiplier]
+    ];
+  }
+
+  return { createState: createState, submitWord: submitWord, total: total, breakdown: breakdown, density: density, breakdownRows: breakdownRows };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Scoring;

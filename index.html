@@ -44,6 +44,7 @@
     <ul class="break" id="breakdown"></ul>
     <button type="button" id="share" class="btn yellow">Share results</button>
     <button type="button" id="endless" class="btn red">Play endless</button>
+    <button type="button" id="privateRoomEnd" class="btn">Private room</button>
     <button type="button" id="archive" class="btn green">Play archive</button>
   </div>
 </div>
@@ -92,9 +93,21 @@
   <div class="card">
     <button type="button" class="close" id="roomResultsClose" aria-label="Close">&times;</button>
     <h2>Room results</h2>
-    <div class="label" id="roomWait"></div>
-    <ol class="room-rank" id="roomRank"></ol>
-    <button type="button" id="roomResultsLeave" class="btn red">Leave room</button>
+    <div id="roomMain">
+      <div class="label" id="roomWait"></div>
+      <ol class="room-rank" id="roomRank"></ol>
+      <div id="roomMine" hidden>
+        <div class="label">your score breakdown</div>
+        <ul class="break" id="roomBreakdown"></ul>
+      </div>
+      <button type="button" id="roomResultsLeave" class="btn red">Leave room</button>
+    </div>
+    <div id="roomList" hidden>
+      <h3 class="room-list-name" id="roomListName"></h3>
+      <ul class="break" id="roomListBreak"></ul>
+      <ul class="room-words" id="roomListWords"></ul>
+      <button type="button" id="roomListBack" class="btn yellow">Back to results</button>
+    </div>
   </div>
 </div>
 <div class="overlay" id="howTo" hidden>
