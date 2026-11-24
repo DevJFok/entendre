@@ -93,13 +93,14 @@
     }).then(function () { try { storage.setItem('entendre_archived', date); } catch (e) { /* ignore */ } }, function () {});
   };
 
-  // Records a finished round in Historical_Scores: date, the two categories, and the score.
-  root.postScore = function (date, a, b, score, mode) {
+  // Records a finished round in Historical_Scores: date, the two categories, the score, the mode, and room_number
+  // (00001 for daily, the 5-digit code for a private room, blank otherwise).
+  root.postScore = function (date, a, b, score, mode, room) {
     if (!CONFIG.endpoint || !root.fetch) return;
     root.fetch(CONFIG.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'score', date: date, category_a: a, category_b: b, score: score, mode: mode }),
+      body: JSON.stringify({ action: 'score', date: date, category_a: a, category_b: b, score: score, mode: mode, room_number: room || '' }),
       keepalive: true
     }).catch(function () {});
   };

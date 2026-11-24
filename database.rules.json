@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "roomCodes": {
+      "$date": {
+        "$code": {
+          ".read": "auth != null",
+          ".write": "auth != null && !data.exists()"
+        }
+      }
+    },
+    "rooms": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('hostId').val() === auth.uid || (data.child('status').val() === 'waiting' && now - data.child('createdAt').val() >= 120000))",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    }
+  }
+}

@@ -180,13 +180,14 @@
     });
     $('end').hidden = false; $('reopen').hidden = true; $('giveUp').hidden = true;
     showCurve(ScoringRef.total(state));
+    if (roomCode && root.EntendreRooms) root.EntendreRooms.finished(ScoringRef.total(state));
   }
 
   // Results curve: only for today's daily game. Reads the earlier scores first, draws the curve without this player,
   // then sends this player's score so it counts for later players.
   function showCurve(total) {
     var box = $('curveBox');
-    if (!isDaily) { box.hidden = true; $('beatLine').textContent = ''; if (root.postScore) root.postScore(roundDate, puzzle.categoryA.term, puzzle.categoryB.term, total, roundMode); return; }
+    if (!isDaily) { box.hidden = true; $('beatLine').textContent = ''; if (root.postScore) root.postScore(roundDate, puzzle.categoryA.term, puzzle.categoryB.term, total, roundMode, roomCode); return; }
     box.hidden = false;
     $('beatLine').textContent = 'checking today’s scores…';
     var date = roundDate, a = puzzle.categoryA.term, b = puzzle.categoryB.term;
@@ -229,18 +230,21 @@
   // If an in-flight submit resolves right at expiry, it is scored before the overlay reads state: wait for busy to clear.
   function finishWhenIdle() { if (busy) setTimeout(finishWhenIdle, 30); else endGame(); }
 
-  var deadline = 0, iv = null;
+  // deadline is null for endless: no timer, the round ends only when the player gives up.
+  var deadline = 0, iv = null, roomCode = null;
   function tick() {
-    if (over) return;
+    if (over || deadline === null) return;
     var left = Math.max(0, deadline - Date.now());
     var s = Math.ceil(left / 1000);
     $('timer').textContent = Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
     $('timer').classList.toggle('low', s <= 10);
     if (left <= 0) { clearInterval(iv); input.disabled = true; $('enter').disabled = true; finishWhenIdle(); }
   }
-  // Starts a round with the given puzzle and a fresh 2-minute timer. daily: true also records the day's categories in the archive.
-  // daily is kept for the call sites; the Archive tab is maintained by hand, so the game only reads it.
-  function startRound(p, mode, date) {
+  // Starts a round with the given puzzle. Daily, archive and room rounds use a 2-minute timer; endless has none.
+  // opts.deadline (ms) sets the end time for a private room, so every player in the room ends together.
+  // opts.roomCode marks a private room round, which is reported to the room and not to the daily curve.
+  function startRound(p, mode, date, opts) {
+    opts = opts || {};
     clearInterval(iv);
     puzzle = p;
     roundDate = date || localDateString(new Date());
@@ -250,13 +254,21 @@
     input.value = ''; showMsg('');
     $('end').hidden = true; $('reopen').hidden = false; $('archivePage').hidden = true;
     $('start').hidden = true; started = true; roundMode = mode; isDaily = mode === 'daily';
+    roomCode = mode === 'room' ? (opts.roomCode || null) : null;
+    $('endless').hidden = mode === 'room'; $('archive').hidden = mode === 'room';
     $('catA').textContent = p.categoryA.label;
     $('catB').textContent = p.categoryB.label;
     render();
     input.disabled = false; $('enter').disabled = false;
-    deadline = Date.now() + DURATION_MS;
-    iv = setInterval(tick, 250);
-    tick();
+    if (mode === 'endless') {
+      deadline = null;
+      $('timer').textContent = 'no limit';
+      $('timer').classList.remove('low');
+    } else {
+      deadline = opts.deadline || (Date.now() + DURATION_MS);
+      iv = setInterval(tick, 250);
+      tick();
+    }
     input.focus();
   }
 
@@ -339,6 +351,16 @@
     clearInterval(iv); input.disabled = true; $('enter').disabled = true;
     finishWhenIdle();
   });
+
+  // Used by private rooms (rooms.js): start the shared round at the room's end time, and read today's puzzle for a new room.
+  root.EntendreGame.startRoom = function (code, a, b, deadline) {
+    startRound(puzzleFor(a, b), 'room', localDateString(new Date()), { deadline: deadline, roomCode: code });
+  };
+  root.EntendreGame.todayPuzzle = function () {
+    var today = localDateString(new Date());
+    var p = scheduledFor(today) || root.Puzzles.dailyPuzzle(today);
+    return { a: p.categoryA.term, b: p.categoryB.term };
+  };
 
   // keep the input visible above the on-screen keyboard
   if (root.visualViewport) {
