@@ -18,6 +18,7 @@
   var code = null, isHost = false, roomRef = null, scheduled = false, lastRoom = null;
   var lobbyTick = null, resultsTick = null, busy = false, myDone = false;
   var myDetail = null, viewUid = null; // this player's breakdown and words after the round; the player whose List is open
+  var roundInfo = null; // { date, a, b } for the room's puzzle, used to compare against today's daily scores
 
   function cfg() { return root.ENTENDRE_FIREBASE || {}; }
   function enabled() { var c = cfg(); return !!(c.apiKey && c.databaseURL && root.firebase && root.firebase.database); }
@@ -163,6 +164,7 @@
     var localStart = data.startAt - offset;
     var deadline = data.startAt + L.ROUND_MS - offset;
     var roundCode = code;
+    roundInfo = { date: data.date, a: data.puzzleA, b: data.puzzleB };
     $('lobbyStatus').textContent = 'Starting…';
     var wait = Math.max(0, localStart - Date.now());
     setTimeout(function () {
@@ -186,6 +188,13 @@
     });
     var ul = $('roomBreakdown'); ul.innerHTML = '';
     if (myDetail.b) fillRows(ul, root.Scoring.breakdownRows(myDetail.b));
+    // Compares this room score with today's daily scores (the daily game only; room scores are not in the daily curve).
+    if (roundInfo && root.scoreStats && root.EntendreGame && root.EntendreGame.drawCurve) {
+      var ri = roundInfo;
+      root.scoreStats(ri.date, ri.a, ri.b, total).then(function (s) {
+        root.EntendreGame.drawCurve(s, total, { svg: $('roomCurve'), beat: $('roomBeat'), box: $('roomCurveBox') });
+      });
+    }
     $('end').hidden = true;
     renderResults();
     clearInterval(resultsTick);
@@ -269,7 +278,7 @@
     clearInterval(lobbyTick); clearInterval(resultsTick);
     if (roomRef) roomRef.off();
     code = null; roomRef = null; isHost = false; scheduled = false; lastRoom = null; myDone = false;
-    myDetail = null; viewUid = null;
+    myDetail = null; viewUid = null; roundInfo = null;
   }
 
   // Detaches listeners before writing, so the removal does not bounce back as "room closed" on this phone.

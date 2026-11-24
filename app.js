@@ -192,23 +192,29 @@
       .then(function () { if (root.postScore) root.postScore(date, a, b, total, 'daily'); });
   }
 
-  // Draws a smooth bell curve of today's logged daily scores (the real results, from the sheet), with the player's score marked.
-  // The curve runs from 0 to the highest score among the logged scores and this player's score, so the marker is always on it.
-  function drawCurve(s, total) {
-    var svg = $('curve'), beat = $('beatLine');
+  // Draws a smooth bell curve of logged daily scores, with the player's score marked.
+  // s: the stats from the sheet ({n, mean, sd, beat, scores}). ui: { svg, beat, box } to draw into; defaults to the daily results card.
+  // If the sheet does not return the score list yet, the curve is drawn from the mean and standard deviation instead.
+  function drawCurve(s, total, ui) {
+    ui = ui || { svg: $('curve'), beat: $('beatLine'), box: $('curveBox') };
+    var svg = ui.svg, beat = ui.beat, box = ui.box;
     var W = 140, BASE = 72, TOP = 12, STEPS = 70;
     svg.innerHTML = '';
-    if (!s) { $('curveBox').hidden = true; beat.textContent = ''; return; }
-    if (!s.n) { $('curveBox').hidden = true; beat.textContent = 'You’re the first player today.'; return; }
+    if (!s) { box.hidden = true; beat.textContent = 'Couldn’t load today’s scores.'; return; }
+    if (!s.n) { box.hidden = true; beat.textContent = 'You’re the first player today.'; return; }
     beat.textContent = s.beat == null ? '' : 'You beat ' + Math.round(s.beat * 100) + '% of players today';
-    var scores = (s.scores || []).slice();
-    if (scores.length < 2) { $('curveBox').hidden = true; return; }
-    $('curveBox').hidden = false;
+    if (s.n < 2) { box.hidden = true; return; }
+    var scores = Array.isArray(s.scores) && s.scores.length ? s.scores.slice() : null;
+    if (!scores && !(s.sd > 0)) { box.hidden = true; return; }
+    var hi = Math.max(1, total, scores ? scores[scores.length - 1] : s.mean + 3 * s.sd);
+    var yAt = scores
+      ? function (x) { return ScoringRef.density(scores, [x])[0]; }
+      : function (x) { var z = (x - s.mean) / s.sd; return Math.exp(-0.5 * z * z); };
+    box.hidden = false;
 
-    var hi = Math.max(1, total, scores[scores.length - 1]);
     var xs = [], i;
     for (i = 0; i <= STEPS; i++) xs.push(hi * i / STEPS);
-    var ys = ScoringRef.density(scores, xs);
+    var ys = xs.map(yAt);
     var peak = Math.max.apply(null, ys) || 1;
     var k = (BASE - TOP) / peak;
     var pts = xs.map(function (x, j) { return [(W * j / STEPS), BASE - ys[j] * k]; });
@@ -218,12 +224,12 @@
     parts.push('<path class="curve-line" d="' + line + '"></path>');
 
     var ux = W * total / hi;
-    var uy = BASE - ScoringRef.density(scores, [total])[0] * k;
+    var uy = BASE - yAt(total) * k;
     parts.push('<line class="curve-you" x1="' + ux.toFixed(1) + '" y1="' + (TOP + 6) + '" x2="' + ux.toFixed(1) + '" y2="' + BASE + '"></line>');
     parts.push('<circle class="curve-dot" cx="' + ux.toFixed(1) + '" cy="' + uy.toFixed(1) + '" r="2.6"></circle>');
     parts.push('<text class="curve-you-label" x="' + Math.min(W - 10, Math.max(10, ux)).toFixed(1) + '" y="' + (TOP - 2) + '" text-anchor="middle">you</text>');
     parts.push('<text class="curve-text" x="0" y="' + (BASE + 10) + '">0</text>');
-    parts.push('<text class="curve-text" x="' + W + '" y="' + (BASE + 10) + '" text-anchor="end">' + hi + '</text>');
+    parts.push('<text class="curve-text" x="' + W + '" y="' + (BASE + 10) + '" text-anchor="end">' + Math.round(hi) + '</text>');
     svg.innerHTML = parts.join('');
   }
 
@@ -357,6 +363,8 @@
   root.EntendreGame.startRoom = function (code, a, b, deadline) {
     startRound(puzzleFor(a, b), 'room', localDateString(new Date()), { deadline: deadline, roomCode: code });
   };
+  // Used by private rooms to draw the same curve on the room results card.
+  root.EntendreGame.drawCurve = drawCurve;
   root.EntendreGame.todayPuzzle = function () {
     var today = localDateString(new Date());
     var p = scheduledFor(today) || root.Puzzles.dailyPuzzle(today);
