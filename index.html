@@ -53,7 +53,48 @@
     <div class="label">pick a game</div>
     <button type="button" id="playToday" class="btn yellow">Play today</button>
     <button type="button" id="playArchive" class="btn green">Play archive</button>
+    <button type="button" id="privateRoom" class="btn">Private room</button>
     <button type="button" id="howToBtn" class="btn">How to play</button>
+  </div>
+</div>
+<div class="overlay" id="roomChoice" hidden>
+  <div class="card">
+    <button type="button" class="close" id="roomChoiceClose" aria-label="Close">&times;</button>
+    <h2>Private room</h2>
+    <div class="label">play with up to 4 friends</div>
+    <div class="beat" id="roomNote"></div>
+    <button type="button" id="roomCreate" class="btn yellow">Create room</button>
+    <button type="button" id="roomJoin" class="btn green">Join room</button>
+  </div>
+</div>
+<div class="overlay" id="roomForm" hidden>
+  <div class="card">
+    <button type="button" class="close" id="roomFormClose" aria-label="Back">&times;</button>
+    <h2 id="roomFormTitle">Create room</h2>
+    <input type="text" id="roomName" class="room-input" maxlength="16" placeholder="your nickname" autocomplete="off" aria-label="Your nickname">
+    <input type="text" id="roomCodeInput" class="room-input" inputmode="numeric" maxlength="5" placeholder="5-digit room number" autocomplete="off" aria-label="Room number" hidden>
+    <button type="button" id="roomFormGo" class="btn yellow">Create</button>
+    <div class="msg" id="roomFormErr" role="status"></div>
+  </div>
+</div>
+<div class="overlay" id="lobby" hidden>
+  <div class="card">
+    <h2>Room</h2>
+    <div class="label">room number</div>
+    <div class="room-code" id="lobbyCode">-----</div>
+    <div class="beat" id="lobbyStatus"></div>
+    <ul class="room-players" id="lobbyPlayers"></ul>
+    <button type="button" id="lobbyStart" class="btn yellow" hidden>Start game</button>
+    <button type="button" id="lobbyLeave" class="btn red">Leave room</button>
+  </div>
+</div>
+<div class="overlay" id="roomResults" hidden>
+  <div class="card">
+    <button type="button" class="close" id="roomResultsClose" aria-label="Close">&times;</button>
+    <h2>Room results</h2>
+    <div class="label" id="roomWait"></div>
+    <ol class="room-rank" id="roomRank"></ol>
+    <button type="button" id="roomResultsLeave" class="btn red">Leave room</button>
   </div>
 </div>
 <div class="overlay" id="howTo" hidden>
@@ -86,5 +127,11 @@
   <script src="review-queue.js"></script>
   <script src="app.js"></script>
 <script src="share.js"></script>
+<script src="rooms-logic.js"></script>
+<script src="firebase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="rooms.js"></script>
 </body>
 </html>

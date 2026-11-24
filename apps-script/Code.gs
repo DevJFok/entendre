@@ -101,20 +101,25 @@ function archiveDay(body) {
   return json({ ok: true, added: 1 });
 }
 
-// Records one finished round in Historical_Scores: date, the two categories, the score, and the mode (daily, archive or endless).
+// Records one finished round in Historical_Scores: date, the two categories, the score, the mode (daily, archive, endless or room),
+// and room_number. Daily rows always carry 00001; a private room carries its 5-digit room number; others leave it blank.
 function scoreRound(body) {
   var ss = SpreadsheetApp.openById(ARCHIVE_SHEET_ID);
   var tz = ss.getSpreadsheetTimeZone();
   var date = isoDate(body.date, tz), a = norm(body.category_a), b = norm(body.category_b);
   var score = Math.round(Number(body.score)), mode = norm(body.mode);
+  var room = String(body.room_number == null ? '' : body.room_number).trim();
+  if (mode === 'daily') room = '00001';
   if (!date || !/^[a-z]+$/.test(a) || !/^[a-z]+$/.test(b) || !isFinite(score) || score < 0 || score > 100000 ||
-      ['daily', 'archive', 'endless'].indexOf(mode) === -1) {
+      ['daily', 'archive', 'endless', 'room'].indexOf(mode) === -1 ||
+      (room && !/^\d{5}$/.test(room)) || (mode === 'room' && (!room || room === '00001'))) {
     return json({ ok: false, error: 'bad score entry' });
   }
   var sheet = ss.getSheetByName('Historical_Scores');
   var row = sheet.getLastRow() + 1;
   sheet.getRange(row, 1).setNumberFormat('@');
-  sheet.getRange(row, 1, 1, 5).setValues([[sheetDate(date), a, b, score, mode]]);
+  sheet.getRange(row, 6).setNumberFormat('@'); // keeps 00001 from turning into 1
+  sheet.getRange(row, 1, 1, 6).setValues([[sheetDate(date), a, b, score, mode, room]]);
   return json({ ok: true, added: 1 });
 }
 
