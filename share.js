@@ -3,13 +3,16 @@
    buildShareText is pure and exported for tests (module.exports in Node). */
 (function (root) {
   'use strict';
+  var SITE_URL = 'https://devjfok.github.io/entendre/';
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
     'August', 'September', 'October', 'November', 'December'];
 
   /* breakdown: the object returned by Scoring.breakdown(state). dateLabel: e.g. 'November 22'.
-     The text is plain copy only: no link, so pasting it never opens a page. */
-  function buildShareText(breakdown, dateLabel) {
+     The first line starts with the word Play, so the link is not the first thing in the pasted text. */
+  function buildShareText(breakdown, dateLabel, siteUrl) {
+    var url = siteUrl == null ? SITE_URL : siteUrl;
     return [
+      'Play: ' + url,
       dateLabel,
       // 🟡 = Colors-only (category A) words, 🟢 = Foods-only (category B) words,
       // ✨ = entendres (both categories). Each line shows its count and the points it earned.
@@ -26,7 +29,7 @@
     return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric' }).format(d);
   }
 
-  var api = { buildShareText: buildShareText, dateLabelFor: dateLabelFor };
+  var api = { buildShareText: buildShareText, dateLabelFor: dateLabelFor, SITE_URL: SITE_URL };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof document === 'undefined') return;
 
