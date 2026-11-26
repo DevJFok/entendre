@@ -158,7 +158,9 @@
     } catch (err) { showMsg('something went wrong'); }
     finally { busy = false; if (!over) input.focus(); }
   }
-  form.addEventListener('submit', onSubmit);
+  // Enter key and the Enter button both submit (the entry is a div so iOS shows no accessory bar).
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') onSubmit(e); });
+  $('enter').addEventListener('click', onSubmit);
 
   function endGame() {
     over = true;

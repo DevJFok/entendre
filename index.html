@@ -21,10 +21,11 @@
   <h1 class="heading">List Words</h1>
   <ul class="words" id="words" aria-live="polite"></ul>
   <div class="msg" id="msg" role="status"></div>
-  <form class="entry" id="form" autocomplete="off">
+  <!-- A div, not a form: iOS shows its up/down/check accessory bar above the keyboard for inputs inside a form. -->
+  <div class="entry" id="form">
     <input id="input" type="text" placeholder="Type here" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Type a word">
-    <button type="submit" id="enter">Enter</button>
-  </form>
+    <button type="button" id="enter">Enter</button>
+  </div>
   <button type="button" id="reopen" class="reopen" hidden>Results</button>
 </main>
 <div class="overlay" id="end" hidden>
